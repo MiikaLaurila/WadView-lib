@@ -5,6 +5,7 @@ import type { WadEndoom } from "./WadEndoom.js";
 import type { WadHeader } from "./WadHeader.js";
 import type { WadPlaypal } from "./WadPlayPal.js";
 import type { WadMapGroupList, WadMapList } from "./map/WadMap.js";
+import type { WadFlat } from "./texture/WadFlat.js";
 import type { WadTextures } from "./texture/WadTextures.js";
 
 export interface Wad {
@@ -12,7 +13,7 @@ export interface Wad {
 	directory: WadDirectory;
 	mapGroups: WadMapGroupList;
 	textures: WadTextures;
-	// patches:
+	flats: WadFlat[];
 	maps: WadMapList;
 	playpal: WadPlaypal;
 	colormap: WadColorMap;
@@ -29,5 +30,6 @@ export const defaultWad: Readonly<Partial<Wad>> = {
 	colormap: undefined,
 	endoom: undefined,
 	textures: undefined,
+	flats: undefined,
 	dehacked: undefined,
 };

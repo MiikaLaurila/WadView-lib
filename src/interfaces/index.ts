@@ -11,6 +11,7 @@ export { WadDirectory, WadDirectoryEntry } from "./wad/WadDirectory.js";
 export { WadEndoom, WadEndoomChar, ANSIColors } from "./wad/WadEndoom.js";
 export { WadFileEvent } from "./wad/WadFileEvent.js";
 export { WadHeader, WadType, defaultWadHeader } from "./wad/WadHeader.js";
+export { WadFlat } from "./wad/texture/WadFlat.js";
 export {
 	WadPlaypal,
 	WadPlaypalRaw,

@@ -7,4 +7,5 @@ export { WadFileHeaderParser } from "./wadFileHeaderParser.js";
 export { WadFileMapGroupParser } from "./wadFileMapGroupParser.js";
 export { WadMapParsingOptions, WadFileMapParser } from "./wadFileMapParser.js";
 export { WadFilePlaypalParser } from "./wadFilePlaypalParser.js";
-export { WadFileTexturesParser } from "./wadTextureParser.js";
+export { WadFileTexturesParser } from "./wadFileTexturesParser.js";
+export { WadFilePatchParser } from "./wadFilePatchParser.js";

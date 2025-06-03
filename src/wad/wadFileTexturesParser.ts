@@ -4,8 +4,6 @@ import {
 	WadFileParser,
 	type WadTextures,
 	type WadDirectoryEntry,
-	type WadPatch,
-	type WadPatchPost,
 	type WadTexture,
 	type WadTexturePatch,
 	texture1LumpName,
@@ -13,6 +11,7 @@ import {
 	pnamesLumpName,
 } from "../interfaces/index.js";
 import { utf8ArrayToStr } from "../utilities/index.js";
+import { WadFilePatchParser } from "./wadFilePatchParser.js";
 
 interface WadFileTexturesParserOptions extends WadParserOptions {
 	dir: WadDirectory;
@@ -42,107 +41,25 @@ export class WadFileTexturesParser extends WadFileParser {
 		const pNamesLump = this.dir.find((l) => l.lumpName === pnamesLumpName);
 		if (pNamesLump) textures.patchNames = this.parsePnames(pNamesLump);
 
+		const patchLumps: WadDirectoryEntry[] = [];
 		for (const pname of textures.patchNames) {
 			const patchLump = this.dir.find((l) => l.lumpName === pname);
 			if (patchLump) {
-				textures.patches[pname] = this.parsePatch(patchLump, pname);
+				patchLumps.push(patchLump);
 			}
 		}
-		return textures;
-	};
 
-	private parsePatch = (
-		patchLump: WadDirectoryEntry,
-		name: string,
-	): WadPatch => {
-		const view = new Uint8Array(
-			this.file.slice(
-				patchLump.lumpLocation,
-				patchLump.lumpLocation + patchLump.lumpSize,
-			),
-		);
-
-		const width = new Uint16Array(view.buffer.slice(0, 2))[0];
-		const height = new Uint16Array(view.buffer.slice(2, 4))[0];
-		const xOffset = new Int16Array(view.buffer.slice(4, 6))[0];
-		const yOffset = new Int16Array(view.buffer.slice(6, 8))[0];
-		const columns: WadPatchPost[][] = [];
-
-		const columnOffsets: number[] = [];
-		for (let i = 0; i < width; i++) {
-			const location = 8 + i * 4;
-			columnOffsets.push(
-				new Uint32Array(view.buffer.slice(location, location + 4))[0],
-			);
-		}
-
-		columnOffsets.forEach((colOffset, idx) => {
-			let endReached = false;
-			let viewPos = 0;
-			let watchDog = 100;
-			let prevYOffset = -1;
-			columns.push([]);
-			while (!endReached && watchDog >= 0) {
-				const readYOffset = new Uint8Array(
-					view.buffer.slice(colOffset + viewPos, colOffset + viewPos + 1),
-				)[0];
-
-				if (readYOffset === 255) {
-					columns[idx].push({
-						yOffset: 0,
-						data: [],
-					});
-					endReached = true;
-				}
-
-				let actualYOffset = readYOffset;
-				if (actualYOffset <= prevYOffset) {
-					actualYOffset = prevYOffset + readYOffset;
-				}
-
-				const len = new Uint8Array(
-					view.buffer.slice(colOffset + viewPos + 1, colOffset + viewPos + 2),
-				)[0];
-				const data: number[] = Array.from(
-					new Uint8Array(
-						view.buffer.slice(
-							colOffset + viewPos + 3,
-							colOffset + viewPos + 3 + len,
-						),
-					),
-				);
-				const nextByte = new Uint8Array(
-					view.buffer.slice(
-						colOffset + viewPos + 3 + len + 1,
-						colOffset + viewPos + 3 + len + 2,
-					),
-				)[0];
-
-				if (nextByte === 0xff) {
-					endReached = true;
-				} else {
-					viewPos = viewPos + 3 + len + 1;
-				}
-				columns[idx].push({
-					yOffset: actualYOffset,
-					data,
-				});
-				watchDog--;
-				if (watchDog === 0) {
-					console.error(patchLump, "triggered watchdog in texture parsing");
-				}
-				prevYOffset = actualYOffset;
-			}
+		const patchParser = new WadFilePatchParser({
+			patchLumps,
+			file: this.file,
+			sendEvent: this.sendEvent,
 		});
 
-		return {
-			name,
-			width,
-			height,
-			xOffset,
-			yOffset,
-			columns,
-		};
+		for (const patch of patchParser.parsePatches()) {
+			textures.patches[patch.name] = patch;
+		}
+
+		return textures;
 	};
 
 	private parseTextureLump = (textureLump: WadDirectoryEntry): WadTexture[] => {

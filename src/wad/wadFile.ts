@@ -18,11 +18,13 @@ import {
 	type WadEndoom,
 	type WadDehacked,
 	type WadTextures,
+	type WadFlat,
 } from "../interfaces/index.js";
 import { WadFileColormapParser } from "./wadFileColormapParser.js";
 import { WadFileDehackedParser } from "./wadFileDehackedParser.js";
 import { WadFileDirectoryParser } from "./wadFileDirectoryParser.js";
 import { WadFileEndoomParser } from "./wadFileEndoomParser.js";
+import { WadFileFlatsParser } from "./wadFileFlatsParser.js";
 import { WadFileHeaderParser } from "./wadFileHeaderParser.js";
 import { WadFileMapGroupParser } from "./wadFileMapGroupParser.js";
 import {
@@ -30,7 +32,7 @@ import {
 	WadFileMapParser,
 } from "./wadFileMapParser.js";
 import { WadFilePlaypalParser } from "./wadFilePlaypalParser.js";
-import { WadFileTexturesParser } from "./wadTextureParser.js";
+import { WadFileTexturesParser } from "./wadFileTexturesParser.js";
 
 interface LogMessage {
 	evt: WadFileEvent;
@@ -504,5 +506,36 @@ export class WadFile {
 
 	private setTextures(textures: WadTextures): void {
 		this._wadStruct.textures = textures;
+	}
+
+	public async flats(): Promise<WadFlat[] | null> {
+		const dir = await this.directory();
+
+		if (dir === null) {
+			return null;
+		}
+
+		if (this._wadStruct.flats !== undefined) {
+			return this._wadStruct.flats;
+		}
+
+		await this.sendEvent(
+			WadFileEvent.FLATS_PARSING,
+			`Flats parsing for ${this._fileUrl}`,
+		);
+		const texturesParser = new WadFileFlatsParser({
+			lumps: [],
+			dir: dir,
+			file: this.wadFile,
+			sendEvent: this.sendEvent,
+		});
+		const flats = texturesParser.parseFlats();
+
+		this.setFlats(flats);
+		return flats;
+	}
+
+	private setFlats(flats: WadFlat[]): void {
+		this._wadStruct.flats = flats;
 	}
 }
