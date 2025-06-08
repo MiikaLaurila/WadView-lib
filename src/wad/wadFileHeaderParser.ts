@@ -1,10 +1,10 @@
 import {
-	WadFileParser,
-	WadType,
 	WadFileEvent,
+	WadFileParser,
 	type WadHeader,
-} from "../interfaces/index.js";
-import { utf8ArrayToStr } from "../utilities/stringUtils.js";
+	WadType,
+	utf8ArrayToStr,
+} from "../index.js";
 
 export class WadFileHeaderParser extends WadFileParser {
 	public parseHeader = () => {

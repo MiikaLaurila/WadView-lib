@@ -1,30 +1,34 @@
 import {
-	type WadParserOptions,
-	WadFileParser,
-	type WadMapThing,
-	type WadThing,
-	WadThingDict,
-	type WadThingType,
-	getWadMapThingGroup,
-	extractWadMapThingFlags,
-	SizeOfMapThing,
-	type WadMapLinedef,
-	extractWadMapLinedefFlags,
-	type WadMapSidedef,
+	MapFormat,
 	type Point,
-	type WadMapSegment,
-	type WadMapSubSector,
+	WadDetectedType,
+	WadFileEvent,
+	WadFileParser,
+	type WadMap,
+	type WadMapBlockMap,
+	type WadMapLinedef,
 	type WadMapNode,
 	WadMapNodeChildType,
-	type WadMapSector,
 	type WadMapRejectTable,
-	type WadMapBlockMap,
-	defaultWadMapBlockmap,
-	type WadMap,
+	type WadMapSector,
+	type WadMapSegment,
+	type WadMapSidedef,
+	type WadMapSubSector,
+	type WadMapThing,
+	WadMapThingChex,
+	WadMapThingDoom,
+	WadMapThingHeretic,
+	type WadMapThingType,
+	type WadParserOptions,
+	type WadThing,
 	defaultWadMap,
-	WadFileEvent,
-} from "../interfaces/index.js";
-import { utf8ArrayToStr } from "../utilities/index.js";
+	defaultWadMapBlockmap,
+	extractWadMapLinedefFlags,
+	extractWadMapThingFlags,
+	getSizeOfMapThing,
+	getWadMapThingGroup,
+	utf8ArrayToStr,
+} from "../index.js";
 
 export interface WadMapParsingOptions {
 	parseSegments?: boolean;
@@ -36,18 +40,34 @@ export interface WadMapParsingOptions {
 
 interface WadMapParserOptions extends WadParserOptions, WadMapParsingOptions {
 	mapName: string;
+	detectedType: WadDetectedType;
 }
 
 export class WadFileMapParser extends WadFileParser {
 	private options: WadMapParserOptions;
 	private mapName: string;
+	private detectedType: WadDetectedType;
 	constructor(options: WadMapParserOptions) {
 		super(options);
 		this.options = options;
 		this.mapName = options.mapName;
+		this.detectedType = options.detectedType;
 	}
 
-	private getMapThings(start: number, size: number): WadMapThing[] {
+	private thingTypeToString(thingType: WadThing): WadMapThingType {
+		switch (this.detectedType) {
+			case WadDetectedType.DOOM:
+				return WadMapThingDoom[thingType] as WadMapThingType;
+			case WadDetectedType.CHEX:
+				return WadMapThingChex[thingType] as WadMapThingType;
+			case WadDetectedType.HERETIC:
+				return WadMapThingHeretic[thingType] as WadMapThingType;
+			default:
+				return WadMapThingDoom[thingType] as WadMapThingType;
+		}
+	}
+
+	private getDoomMapThings(start: number, size: number): WadMapThing[] {
 		const things: WadMapThing[] = [];
 		const thingEntryLength = 10;
 		const thingCount = size / thingEntryLength;
@@ -66,13 +86,13 @@ export class WadFileMapParser extends WadFileParser {
 			const thingType: WadThing = new Int16Array(
 				view.buffer.slice(viewStart + 6, viewStart + 8),
 			)[0];
-			const thingTypeString = WadThingDict[thingType] as WadThingType;
+			const thingTypeString = this.thingTypeToString(thingType);
 			const thingGroup = getWadMapThingGroup(thingTypeString);
 			const flags = new Int16Array(
 				view.buffer.slice(viewStart + 8, viewStart + 10),
 			)[0];
 			const flagsString = extractWadMapThingFlags(flags);
-			const size = SizeOfMapThing[thingTypeString];
+			const size = getSizeOfMapThing(thingTypeString);
 			things.push({
 				x: xPos,
 				y: yPos,
@@ -88,7 +108,48 @@ export class WadFileMapParser extends WadFileParser {
 		return things;
 	}
 
-	private getMapLinedefs(start: number, size: number): WadMapLinedef[] {
+	private getHexenMapThings(start: number, size: number): WadMapThing[] {
+		const things: WadMapThing[] = [];
+		const thingEntryLength = 20;
+		const thingCount = size / thingEntryLength;
+		const view = new Uint8Array(this.file.slice(start, start + size));
+		for (let i = 0; i < thingCount; i++) {
+			const viewStart = i * thingEntryLength;
+			const xPos = new Int16Array(
+				view.buffer.slice(viewStart + 2, viewStart + 4),
+			)[0];
+			const yPos = new Int16Array(
+				view.buffer.slice(viewStart + 4, viewStart + 6),
+			)[0];
+			const angle = new Int16Array(
+				view.buffer.slice(viewStart + 8, viewStart + 10),
+			)[0];
+			const thingType: WadMapThingDoom = new Int16Array(
+				view.buffer.slice(viewStart + 10, viewStart + 12),
+			)[0];
+			const thingTypeString = this.thingTypeToString(thingType);
+			const thingGroup = getWadMapThingGroup(thingTypeString);
+			const flags = new Int16Array(
+				view.buffer.slice(viewStart + 12, viewStart + 14),
+			)[0];
+			const flagsString = extractWadMapThingFlags(flags);
+			const size = getSizeOfMapThing(thingTypeString);
+			things.push({
+				x: xPos,
+				y: yPos,
+				angle,
+				thingType,
+				flags,
+				thingTypeString,
+				flagsString,
+				thingGroup,
+				size,
+			});
+		}
+		return things;
+	}
+
+	private getDoomMapLinedefs(start: number, size: number): WadMapLinedef[] {
 		const linedefs: WadMapLinedef[] = [];
 		const linedefEntryLength = 14;
 		const linedefCount = size / linedefEntryLength;
@@ -101,14 +162,14 @@ export class WadFileMapParser extends WadFileParser {
 			const end = new Uint16Array(
 				view.buffer.slice(viewStart + 2, viewStart + 4),
 			)[0];
-			const flags = new Int16Array(
+			const flags = new Uint16Array(
 				view.buffer.slice(viewStart + 4, viewStart + 6),
 			)[0];
 			const flagsString = extractWadMapLinedefFlags(flags);
-			const specialType = new Int16Array(
+			const specialType = new Uint16Array(
 				view.buffer.slice(viewStart + 6, viewStart + 8),
 			)[0];
-			const sectorTag = new Int16Array(
+			const sectorTag = new Uint16Array(
 				view.buffer.slice(viewStart + 8, viewStart + 10),
 			)[0];
 			const frontSideDef = new Uint16Array(
@@ -124,6 +185,46 @@ export class WadFileMapParser extends WadFileParser {
 				flagsString,
 				specialType,
 				sectorTag,
+				frontSideDef,
+				backSideDef,
+			});
+		}
+		return linedefs;
+	}
+
+	private getHexenMapLineDefs(start: number, size: number): WadMapLinedef[] {
+		const linedefs: WadMapLinedef[] = [];
+		const linedefEntryLength = 16;
+		const linedefCount = size / linedefEntryLength;
+		const view = new Uint8Array(this.file.slice(start, start + size));
+		for (let i = 0; i < linedefCount; i++) {
+			const viewStart = i * linedefEntryLength;
+			const start = new Uint16Array(
+				view.buffer.slice(viewStart, viewStart + 2),
+			)[0];
+			const end = new Uint16Array(
+				view.buffer.slice(viewStart + 2, viewStart + 4),
+			)[0];
+			const flags = new Uint16Array(
+				view.buffer.slice(viewStart + 4, viewStart + 6),
+			)[0];
+			const flagsString = extractWadMapLinedefFlags(flags);
+			const specialType = new Uint8Array(
+				view.buffer.slice(viewStart + 6, viewStart + 7),
+			)[0];
+			const frontSideDef = new Uint16Array(
+				view.buffer.slice(viewStart + 12, viewStart + 14),
+			)[0];
+			const backSideDef = new Uint16Array(
+				view.buffer.slice(viewStart + 14, viewStart + 16),
+			)[0];
+			linedefs.push({
+				start,
+				end,
+				flags,
+				flagsString,
+				specialType,
+				sectorTag: 0,
 				frontSideDef,
 				backSideDef,
 			});
@@ -477,28 +578,65 @@ export class WadFileMapParser extends WadFileParser {
 	public parseMap = async () => {
 		const map: WadMap = JSON.parse(JSON.stringify(defaultWadMap));
 		map.name = this.mapName;
+
+		const format: MapFormat = (() => {
+			if (this.lumps.find((lump) => lump.lumpName === "BEHAVIOR")) {
+				return MapFormat.HEXEN;
+			}
+			if (this.lumps.find((lump) => lump.lumpName === "TEXTMAP")) {
+				return MapFormat.UDMF;
+			}
+			return MapFormat.DOOM;
+		})();
+
 		const thingLump = this.lumps.find((lump) => lump.lumpName === "THINGS");
 		if (thingLump !== undefined) {
 			await this.sendEvent(
 				WadFileEvent.MAP_THINGS_PARSING,
-				`Things parsed for ${this.mapName}`,
+				`Things parsed for ${this.mapName} | Format: ${format}`,
 			);
-			map.things = this.getMapThings(
-				thingLump.lumpLocation,
-				thingLump.lumpSize,
-			);
+			switch (format) {
+				case MapFormat.DOOM:
+					map.things = this.getDoomMapThings(
+						thingLump.lumpLocation,
+						thingLump.lumpSize,
+					);
+					break;
+				case MapFormat.HEXEN:
+					map.things = this.getHexenMapThings(
+						thingLump.lumpLocation,
+						thingLump.lumpSize,
+					);
+					break;
+				case MapFormat.UDMF:
+					map.things = [];
+					break;
+			}
 		}
 
 		const linedefLump = this.lumps.find((lump) => lump.lumpName === "LINEDEFS");
 		if (linedefLump !== undefined) {
 			await this.sendEvent(
 				WadFileEvent.MAP_LININGEFS_PARSING,
-				`Linedefs parsing for ${this.mapName}`,
+				`Linedefs parsing for ${this.mapName} | Format: ${format}`,
 			);
-			map.linedefs = this.getMapLinedefs(
-				linedefLump.lumpLocation,
-				linedefLump.lumpSize,
-			);
+			switch (format) {
+				case MapFormat.DOOM:
+					map.linedefs = this.getDoomMapLinedefs(
+						linedefLump.lumpLocation,
+						linedefLump.lumpSize,
+					);
+					break;
+				case MapFormat.HEXEN:
+					map.linedefs = this.getHexenMapLineDefs(
+						linedefLump.lumpLocation,
+						linedefLump.lumpSize,
+					);
+					break;
+				case MapFormat.UDMF:
+					map.linedefs = [];
+					break;
+			}
 		}
 
 		const sidedefLump = this.lumps.find((lump) => lump.lumpName === "SIDEDEFS");

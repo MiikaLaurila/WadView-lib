@@ -1,37 +1,55 @@
 import {
-	type WadParserOptions,
-	WadFileParser,
 	type WadDirectoryEntry,
+	WadFileParser,
+	type WadParserOptions,
 	type WadPatch,
 	type WadPatchPost,
-} from "../interfaces/index.js";
+} from "../index.js";
 
 interface WadFilePatchParserOptions extends WadParserOptions {
-	patchLumps: WadDirectoryEntry[];
+	patchLumps?: WadDirectoryEntry[];
 }
 
 export class WadFilePatchParser extends WadFileParser {
-	patchLumps: WadDirectoryEntry[];
+	patchLumps?: WadDirectoryEntry[];
 	constructor(opts: WadFilePatchParserOptions) {
 		super(opts);
 		this.patchLumps = opts.patchLumps;
 	}
 
-	public parsePatches = (): WadPatch[] => {
+	public parsePatches = (patchLumps?: WadDirectoryEntry[]): WadPatch[] => {
+		const lumpsToParse = patchLumps ?? this.patchLumps;
+
+		if (!lumpsToParse) {
+			console.error(
+				"You must provide patch lumps either in constructor or as method argument",
+			);
+			return [];
+		}
+
 		const patches: WadPatch[] = [];
-		for (const patchLump of this.patchLumps) {
-			patches.push(this.parsePatch(patchLump));
+		for (const patchLump of lumpsToParse) {
+			const patch = this.parsePatch(patchLump);
+			if (patch) patches.push(patch);
 		}
 		return patches;
 	};
 
-	private parsePatch = (patchLump: WadDirectoryEntry): WadPatch => {
+	public parsePatch = (patchLump: WadDirectoryEntry): WadPatch | null => {
 		const view = new Uint8Array(
 			this.file.slice(
 				patchLump.lumpLocation,
 				patchLump.lumpLocation + patchLump.lumpSize,
 			),
 		);
+
+		const isPng =
+			JSON.stringify(Array.from(new Uint8Array(view.buffer.slice(1, 4)))) ===
+			JSON.stringify([80, 78, 71]);
+		if (isPng) {
+			console.log(patchLump.lumpName, "is a PNG file which are not supported");
+			return null;
+		}
 
 		const width = new Uint16Array(view.buffer.slice(0, 2))[0];
 		const height = new Uint16Array(view.buffer.slice(2, 4))[0];
@@ -40,6 +58,7 @@ export class WadFilePatchParser extends WadFileParser {
 		const columns: WadPatchPost[][] = [];
 
 		const columnOffsets: number[] = [];
+
 		for (let i = 0; i < width; i++) {
 			const location = 8 + i * 4;
 			columnOffsets.push(

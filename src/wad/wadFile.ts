@@ -1,38 +1,43 @@
 import {
-	playpalLumpName,
-	colormapLumpName,
-	endoomLumpName,
-	dehackedLumpName,
-} from "../interfaces/constants.js";
-import {
-	WadFileEvent,
 	type Wad,
-	defaultWad,
-	type WadHeader,
+	type WadColorMap,
+	type WadDehacked,
+	WadDetectedType,
 	type WadDirectory,
+	type WadEndoom,
+	WadFileEvent,
+	type WadFlat,
+	type WadHeader,
 	type WadMapGroupList,
 	type WadMapList,
+	type WadMenuGraphic,
+	type WadMusic,
 	type WadPlaypal,
-	preFilledPlaypal,
-	type WadColorMap,
-	type WadEndoom,
-	type WadDehacked,
+	type WadSprite,
 	type WadTextures,
-	type WadFlat,
+	colormapLumpName,
+	defaultWad,
+	dehackedLumpName,
+	endoomLumpName,
+	playpalLumpName,
+	preFilledPlaypal,
 } from "../interfaces/index.js";
-import { WadFileColormapParser } from "./wadFileColormapParser.js";
-import { WadFileDehackedParser } from "./wadFileDehackedParser.js";
-import { WadFileDirectoryParser } from "./wadFileDirectoryParser.js";
-import { WadFileEndoomParser } from "./wadFileEndoomParser.js";
-import { WadFileFlatsParser } from "./wadFileFlatsParser.js";
-import { WadFileHeaderParser } from "./wadFileHeaderParser.js";
-import { WadFileMapGroupParser } from "./wadFileMapGroupParser.js";
 import {
-	type WadMapParsingOptions,
+	WadFileColormapParser,
+	WadFileDehackedParser,
+	WadFileDirectoryParser,
+	WadFileEndoomParser,
+	WadFileFlatsParser,
+	WadFileHeaderParser,
+	WadFileMapGroupParser,
 	WadFileMapParser,
-} from "./wadFileMapParser.js";
-import { WadFilePlaypalParser } from "./wadFilePlaypalParser.js";
-import { WadFileTexturesParser } from "./wadFileTexturesParser.js";
+	WadFileMenuGraphicParser,
+	WadFileMusicParser,
+	WadFilePlaypalParser,
+	WadFileSpritesParser,
+	WadFileTexturesParser,
+	type WadMapParsingOptions,
+} from "./index.js";
 
 interface LogMessage {
 	evt: WadFileEvent;
@@ -65,6 +70,12 @@ export class WadFile {
 		this._breatheInLog = opts.breatheInLog ?? false;
 		if (opts.eventListener !== undefined) {
 			this._eventSink = opts.eventListener;
+		}
+		if (opts.fileUrl !== undefined && opts.readyCb === undefined) {
+			const msg =
+				"Ready callback option is required when providing a file URL directly to constructor";
+			console.info(msg);
+			this.sendEvent(WadFileEvent.MISSING_READYCB, msg);
 		}
 		if (opts.fileUrl !== undefined && opts.readyCb !== undefined) {
 			this._fileUrl = opts.fileUrl;
@@ -243,6 +254,42 @@ export class WadFile {
 		this._wadStruct.header = header;
 	}
 
+	public async detectedType(): Promise<WadDetectedType | null> {
+		if (!this.fileLoaded) {
+			return null;
+		}
+		if (this._wadStruct.detectedType !== undefined) {
+			return this._wadStruct.detectedType;
+		}
+
+		const fileNameCheck = this.niceFileName.toLowerCase();
+
+		let currentDetectType = WadDetectedType.DOOM;
+
+		if (fileNameCheck.includes("heretic"))
+			currentDetectType = WadDetectedType.HERETIC;
+
+		if (fileNameCheck.includes("hexen"))
+			currentDetectType = WadDetectedType.HEXEN;
+
+		if (fileNameCheck.includes("chex"))
+			currentDetectType = WadDetectedType.CHEX;
+
+		if (fileNameCheck.includes("strife"))
+			currentDetectType = WadDetectedType.STRIFE;
+
+		await this.sendEvent(
+			WadFileEvent.DETECTED_TYPE_SET,
+			`Set detected WAD type to ${currentDetectType}`,
+		);
+		this.setDetectedType(currentDetectType);
+		return currentDetectType;
+	}
+
+	private setDetectedType(detectedType: WadDetectedType): void {
+		this._wadStruct.detectedType = detectedType;
+	}
+
 	public async directory(): Promise<WadDirectory | null> {
 		const header = await this.header();
 		if (header === null) {
@@ -261,6 +308,10 @@ export class WadFile {
 			header,
 		});
 		const directory = directoryParser.parseDirectory();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${directory.length} lumps`,
+		);
 		this.setDirectory(directory);
 		return directory;
 	}
@@ -325,10 +376,16 @@ export class WadFile {
 				mapName: mapGroup.name,
 				file: this.wadFile,
 				sendEvent: this.sendEvent,
+				detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
 			});
 			const map = await mapParser.parseMap();
 			maps.push(map);
 		}
+
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${maps.length} maps`,
+		);
 
 		this.setMaps(maps);
 		return maps;
@@ -499,6 +556,10 @@ export class WadFile {
 			sendEvent: this.sendEvent,
 		});
 		const textures = texturesParser.parseTextures();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${textures.texture1.length + textures.texture2.length} textures with ${Object.keys(textures.patches).length} patches`,
+		);
 
 		this.setTextures(textures);
 		return textures;
@@ -530,6 +591,10 @@ export class WadFile {
 			sendEvent: this.sendEvent,
 		});
 		const flats = texturesParser.parseFlats();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${flats.length} flats`,
+		);
 
 		this.setFlats(flats);
 		return flats;
@@ -537,5 +602,110 @@ export class WadFile {
 
 	private setFlats(flats: WadFlat[]): void {
 		this._wadStruct.flats = flats;
+	}
+
+	public async sprites(): Promise<WadSprite[] | null> {
+		const dir = await this.directory();
+
+		if (dir === null) {
+			return null;
+		}
+
+		if (this._wadStruct.sprites !== undefined) {
+			return this._wadStruct.sprites;
+		}
+
+		await this.sendEvent(
+			WadFileEvent.SPRITES_PARSING,
+			`Sprites parsing for ${this._fileUrl}`,
+		);
+		const spritesParser = new WadFileSpritesParser({
+			lumps: [],
+			dir: dir,
+			file: this.wadFile,
+			sendEvent: this.sendEvent,
+		});
+		const sprites = spritesParser.parseSprites();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${sprites.length} sprites with ${sprites.reduce((p, c) => p + c.frames.length, 0)} frames`,
+		);
+
+		this.setSprites(sprites);
+		return sprites;
+	}
+
+	private setSprites(sprites: WadSprite[]): void {
+		this._wadStruct.sprites = sprites;
+	}
+
+	public async menuGraphics(): Promise<WadMenuGraphic[] | null> {
+		const dir = await this.directory();
+
+		if (dir === null) {
+			return null;
+		}
+
+		if (this._wadStruct.menuGraphics !== undefined) {
+			return this._wadStruct.menuGraphics;
+		}
+
+		await this.sendEvent(
+			WadFileEvent.MENU_GRAPHICS_PARSING,
+			`Menu graphics parsing for ${this._fileUrl}`,
+		);
+		const menuGraphicsParser = new WadFileMenuGraphicParser({
+			lumps: [],
+			dir: dir,
+			file: this.wadFile,
+			sendEvent: this.sendEvent,
+		});
+		const menuGraphics = menuGraphicsParser.parseMenuGraphics();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${menuGraphics.length} menu graphics`,
+		);
+
+		this.setMenuGraphics(menuGraphics);
+		return menuGraphics;
+	}
+
+	private setMenuGraphics(menuGraphics: WadMenuGraphic[]): void {
+		this._wadStruct.menuGraphics = menuGraphics;
+	}
+
+	public async music(): Promise<WadMusic[] | null> {
+		const dir = await this.directory();
+
+		if (dir === null) {
+			return null;
+		}
+
+		if (this._wadStruct.music !== undefined) {
+			return this._wadStruct.music;
+		}
+
+		await this.sendEvent(
+			WadFileEvent.MUSIC_PARSING,
+			`Music parsing for ${this._fileUrl}`,
+		);
+		const musicParser = new WadFileMusicParser({
+			lumps: [],
+			dir: dir,
+			file: this.wadFile,
+			sendEvent: this.sendEvent,
+		});
+		const music = await musicParser.parseMusic();
+		await this.sendEvent(
+			WadFileEvent.PARSED_COUNT,
+			`Parsed ${music.length} music files`,
+		);
+
+		this.setMusic(music);
+		return music;
+	}
+
+	private setMusic(music: WadMusic[]): void {
+		this._wadStruct.music = music;
 	}
 }

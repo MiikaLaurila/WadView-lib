@@ -1,14 +1,15 @@
-import type { IntRange } from "../../IntRange.js";
-import { type WadPlaypal, preFilledPlaypal } from "../WadPlayPal.js";
-import type { WadMap } from "./WadMap.js";
 import {
+	type IntRange,
+	type WadMap,
 	type WadMapLinedef,
+	type WadPlaypal,
 	isBlueDoor,
 	isExit,
 	isRedDoor,
 	isTeleporter,
 	isYellowDoor,
-} from "./WadMapLinedef.js";
+	preFilledPlaypal,
+} from "../../index.js";
 
 export interface MapWindowPalette {
 	name: string;

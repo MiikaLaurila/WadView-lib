@@ -1,5 +1,4 @@
-import { colormapLumpName } from "../interfaces/constants.js";
-import { WadFileParser, type WadColorMap } from "../interfaces/index.js";
+import { type WadColorMap, WadFileParser, colormapLumpName } from "../index.js";
 
 export class WadFileColormapParser extends WadFileParser {
 	public parseColormap = (): WadColorMap => {

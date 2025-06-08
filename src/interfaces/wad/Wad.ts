@@ -1,12 +1,26 @@
-import type { WadColorMap } from "./WadColorMap.js";
-import type { WadDehacked } from "./WadDehacked.js";
-import type { WadDirectory } from "./WadDirectory.js";
-import type { WadEndoom } from "./WadEndoom.js";
-import type { WadHeader } from "./WadHeader.js";
-import type { WadPlaypal } from "./WadPlayPal.js";
-import type { WadMapGroupList, WadMapList } from "./map/WadMap.js";
-import type { WadFlat } from "./texture/WadFlat.js";
-import type { WadTextures } from "./texture/WadTextures.js";
+import type {
+	WadColorMap,
+	WadDehacked,
+	WadDirectory,
+	WadEndoom,
+	WadFlat,
+	WadHeader,
+	WadMapGroupList,
+	WadMapList,
+	WadMenuGraphic,
+	WadMusic,
+	WadPlaypal,
+	WadSprite,
+	WadTextures,
+} from "../index.js";
+
+export enum WadDetectedType {
+	DOOM = "DOOM",
+	HEXEN = "HEXEN",
+	HERETIC = "HERETIC",
+	CHEX = "CHEX",
+	STRIFE = "STRIFE",
+}
 
 export interface Wad {
 	header: WadHeader;
@@ -14,11 +28,15 @@ export interface Wad {
 	mapGroups: WadMapGroupList;
 	textures: WadTextures;
 	flats: WadFlat[];
+	sprites: WadSprite[];
 	maps: WadMapList;
 	playpal: WadPlaypal;
 	colormap: WadColorMap;
 	endoom: WadEndoom;
 	dehacked: WadDehacked | null;
+	detectedType: WadDetectedType;
+	menuGraphics: WadMenuGraphic[];
+	music: WadMusic[];
 }
 
 export const defaultWad: Readonly<Partial<Wad>> = {
@@ -31,5 +49,9 @@ export const defaultWad: Readonly<Partial<Wad>> = {
 	endoom: undefined,
 	textures: undefined,
 	flats: undefined,
+	sprites: undefined,
 	dehacked: undefined,
+	detectedType: undefined,
+	menuGraphics: undefined,
+	music: undefined,
 };

@@ -1,7 +1,7 @@
 {
 	"name": "wadview-lib",
 	"version": "0.0.6",
-	"description": "Parse and present Doom .wad files ",
+	"description": "Parse and present Doom .wad files",
 	"license": "ISC",
 	"author": "Miika Laurila <laurila.miika@gmail.com>",
 	"types": "./dist/index.d.ts",
@@ -14,21 +14,21 @@
 	},
 	"typesVersions": {
 		"*": {
-			"*": [
-				"dist/*"
-			]
+			"*": ["dist/*"]
 		}
 	},
-	"files": [
-		"dist",
-		"src"
-	],
+	"files": ["dist", "src"],
 	"scripts": {
 		"build": "tsc",
+		"lint": "biome check ./src",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",
+		"@types/node": "^22.15.30",
 		"typescript": "^5.8.3"
+	},
+	"dependencies": {
+		"file-type": "^21.0.0"
 	}
 }

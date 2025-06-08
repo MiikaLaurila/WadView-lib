@@ -1,5 +1,4 @@
-import type { WadDirectoryEntry } from "./WadDirectory.js";
-import type { WadFileEvent } from "./WadFileEvent.js";
+import type { WadDirectoryEntry, WadFileEvent } from "../index.js";
 
 type EventFunc = (type: WadFileEvent, msg?: string) => Promise<void>;
 

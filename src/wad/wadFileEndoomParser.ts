@@ -1,10 +1,10 @@
-import { endoomLumpName } from "../interfaces/constants.js";
 import {
-	WadFileParser,
-	type WadEndoom,
 	ANSIColors,
-} from "../interfaces/index.js";
-import { cp347toUtf8 } from "../utilities/stringUtils.js";
+	type WadEndoom,
+	WadFileParser,
+	cp347toUtf8,
+	endoomLumpName,
+} from "../index.js";
 
 export class WadFileEndoomParser extends WadFileParser {
 	public parseEndoom = (): WadEndoom => {

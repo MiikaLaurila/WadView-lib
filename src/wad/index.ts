@@ -1,4 +1,3 @@
-export { WadFile } from "./wadFile.js";
 export { WadFileColormapParser } from "./wadFileColormapParser.js";
 export { WadFileDehackedParser } from "./wadFileDehackedParser.js";
 export { WadFileDirectoryParser } from "./wadFileDirectoryParser.js";
@@ -9,3 +8,8 @@ export { WadMapParsingOptions, WadFileMapParser } from "./wadFileMapParser.js";
 export { WadFilePlaypalParser } from "./wadFilePlaypalParser.js";
 export { WadFileTexturesParser } from "./wadFileTexturesParser.js";
 export { WadFilePatchParser } from "./wadFilePatchParser.js";
+export { WadFileSpritesParser } from "./wadFileSpritesParser.js";
+export { WadFileFlatsParser } from "./wadFileFlatsParser.js";
+export { WadFileMenuGraphicParser } from "./wadFileMenuGraphicParser.js";
+export { WadFileMusicParser } from "./wadFileMusicParser.js";
+export { WadFile } from "./wadFile.js";

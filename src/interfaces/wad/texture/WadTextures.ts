@@ -1,4 +1,4 @@
-import type { WadPatch } from "./WadPatch.js";
+import type { WadPatch } from "../../index.js";
 
 export interface WadTexturePatch {
 	xOffset: number;

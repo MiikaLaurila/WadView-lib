@@ -1,12 +1,12 @@
 import {
-	type WadParserOptions,
 	type WadDirectory,
-	WadFileParser,
 	type WadDirectoryEntry,
+	WadFileParser,
 	type WadFlat,
-	flatStartLumpMatcher,
+	type WadParserOptions,
 	flatEndLumpMatcher,
-} from "../interfaces/index.js";
+	flatStartLumpMatcher,
+} from "../index.js";
 
 interface WadFileFlatsParserOptions extends WadParserOptions {
 	dir: WadDirectory;

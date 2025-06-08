@@ -1,10 +1,10 @@
 import {
-	type WadParserOptions,
-	type WadHeader,
-	WadFileParser,
 	type WadDirectory,
-} from "../interfaces/index.js";
-import { utf8ArrayToStr } from "../utilities/stringUtils.js";
+	WadFileParser,
+	type WadHeader,
+	type WadParserOptions,
+	utf8ArrayToStr,
+} from "../index.js";
 
 interface WadDirectoryParserOptions extends WadParserOptions {
 	header: WadHeader;
@@ -38,7 +38,7 @@ export class WadFileDirectoryParser extends WadFileParser {
 			const lumpName = utf8ArrayToStr(
 				view.subarray(viewStart + 8, viewStart + 16),
 			).toUpperCase();
-			directory.push({ lumpLocation, lumpSize, lumpName });
+			directory.push({ lumpLocation, lumpSize, lumpName, lumpIdx: i });
 		}
 		return directory;
 	};

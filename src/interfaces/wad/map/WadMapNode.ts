@@ -1,4 +1,4 @@
-import type { WadMapBBox } from "./WadMapBBox.js";
+import type { WadMapBBox } from "../../index.js";
 
 export enum WadMapNodeChildType {
 	SUBNODE = "SUBNODE",

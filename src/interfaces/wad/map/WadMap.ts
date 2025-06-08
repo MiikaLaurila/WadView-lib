@@ -1,16 +1,27 @@
-import type { Point } from "../../Point.js";
-import type { WadDirectoryEntry } from "../WadDirectory.js";
-import { type WadMapBlockMap, defaultWadMapBlockmap } from "./WadMapBlockmap.js";
-import type { WadMapLinedef } from "./WadMapLinedef.js";
-import type { WadMapNode } from "./WadMapNode.js";
-import type { WadMapRejectTable } from "./WadMapRejectTable.js";
-import type { WadMapSector } from "./WadMapSector.js";
-import type { WadMapSegment } from "./WadMapSegment.js";
-import type { WadMapSidedef } from "./WadMapSidedef.js";
-import type { WadMapSubSector } from "./WadMapSubSector.js";
-import type { WadMapThing } from "./WadMapThing.js";
+import {
+	type Point,
+	type WadDirectoryEntry,
+	type WadMapBlockMap,
+	type WadMapLinedef,
+	type WadMapNode,
+	type WadMapRejectTable,
+	type WadMapSector,
+	type WadMapSegment,
+	type WadMapSidedef,
+	type WadMapSubSector,
+	type WadMapThing,
+	defaultWadMapBlockmap,
+} from "../../index.js";
+
+export enum MapFormat {
+	DOOM = "DOOM",
+	HEXEN = "HEXEN",
+	UDMF = "UDMF",
+}
 
 export const mapLumps = [
+	"TEXTMAP",
+	"HEADER",
 	"THINGS",
 	"LINEDEFS",
 	"SIDEDEFS",
@@ -21,6 +32,8 @@ export const mapLumps = [
 	"SECTORS",
 	"REJECT",
 	"BLOCKMAP",
+	"BEHAVIOR",
+	"SCRIPTS",
 ] as const;
 export type MapLump = (typeof mapLumps)[number];
 export const isMapLump = (lumpName: unknown): lumpName is MapLump => {

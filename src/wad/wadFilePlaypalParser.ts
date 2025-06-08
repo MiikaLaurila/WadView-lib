@@ -1,10 +1,10 @@
 import {
 	WadFileParser,
 	type WadPlaypal,
+	type WadPlaypalTypedEntry,
 	defaultPlaypal,
 	playpalLumpName,
-	type WadPlaypalTypedEntry,
-} from "../interfaces/index.js";
+} from "../index.js";
 
 export class WadFilePlaypalParser extends WadFileParser {
 	public parsePlaypal = (): WadPlaypal => {

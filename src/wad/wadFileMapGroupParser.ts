@@ -1,11 +1,11 @@
 import {
-	type WadParserOptions,
+	type MapGroupDirectory,
 	type WadDirectory,
 	WadFileParser,
-	type MapGroupDirectory,
 	type WadMapGroupList,
+	type WadParserOptions,
 	isMapGroupDirectoryEntry,
-} from "../interfaces/index.js";
+} from "../index.js";
 
 interface WadMapGroupParserOptions extends WadParserOptions {
 	directory: WadDirectory;
@@ -19,7 +19,7 @@ export class WadFileMapGroupParser extends WadFileParser {
 	}
 
 	public parseMapGroups = () => {
-		let foundLumps: MapGroupDirectory = [];
+		let currentGroup: MapGroupDirectory = [];
 		let currentMapName: string | null = null;
 		let mapGroups: WadMapGroupList = [];
 
@@ -27,15 +27,20 @@ export class WadFileMapGroupParser extends WadFileParser {
 			const isValid = isMapGroupDirectoryEntry(entry);
 			if (isValid && !currentMapName) {
 				currentMapName = arr[idx - 1].lumpName;
-				foundLumps.push(entry);
-			} else if (isValid && idx !== arr.length - 1 && currentMapName) {
-				foundLumps.push(entry);
+				currentGroup.push(entry);
+			} else if (isValid && currentMapName) {
+				currentGroup.push(entry);
 			} else if ((!isValid || idx === arr.length - 1) && currentMapName) {
-				mapGroups.push({ name: currentMapName, lumps: foundLumps });
+				mapGroups.push({ name: currentMapName, lumps: currentGroup });
 				currentMapName = null;
-				foundLumps = [];
+				currentGroup = [];
 			}
 		});
+
+		if (currentMapName) {
+			mapGroups.push({ name: currentMapName, lumps: currentGroup });
+		}
+
 		mapGroups = mapGroups.sort((a, b) => a.name.localeCompare(b.name));
 		return mapGroups;
 	};
