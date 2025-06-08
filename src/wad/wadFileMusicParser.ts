@@ -1,5 +1,6 @@
 import { fileTypeFromBuffer } from "file-type";
 import {
+	WadDetectedType,
 	type WadDirectory,
 	type WadDirectoryEntry,
 	WadFileParser,
@@ -9,17 +10,23 @@ import {
 
 interface WadFileMusicParserOptions extends WadParserOptions {
 	dir: WadDirectory;
+	detectedType: WadDetectedType;
 }
 
 export class WadFileMusicParser extends WadFileParser {
-	dir: WadDirectory;
+	private dir: WadDirectory;
+	private detectedType: WadDetectedType;
 	constructor(opts: WadFileMusicParserOptions) {
 		super(opts);
 		this.dir = opts.dir;
+		this.detectedType = opts.detectedType;
 	}
 
 	public parseMusic = async (): Promise<WadMusic[]> => {
 		const musicLumps: WadDirectoryEntry[] = [];
+		if (this.detectedType !== WadDetectedType.DOOM) {
+			return [];
+		}
 		const prefixes = ["D_", "H_", "O_"];
 		const blacklist = [""];
 

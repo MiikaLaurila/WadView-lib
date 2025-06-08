@@ -1,33 +1,37 @@
 import {
+	WadDetectedType,
 	type WadDirectory,
 	type WadDirectoryEntry,
 	WadFileParser,
 	WadFilePatchParser,
 	type WadMenuGraphic,
 	type WadParserOptions,
-	type WadSprite,
 	flatEndLumpMatcher,
 	flatStartLumpMatcher,
 	patchEndLumpMatcher,
 	patchStartLumpMatcher,
 	spriteEndLumpMatcher,
-	spriteFrameMatcher,
-	spriteMirroredFrameMatcher,
 	spriteStartLumpMatcher,
 } from "../index.js";
 
 interface WadFileMenuGraphicParserOptions extends WadParserOptions {
 	dir: WadDirectory;
+	detectedType: WadDetectedType;
 }
 
 export class WadFileMenuGraphicParser extends WadFileParser {
-	dir: WadDirectory;
+	private dir: WadDirectory;
+	private detectedType: WadDetectedType;
 	constructor(opts: WadFileMenuGraphicParserOptions) {
 		super(opts);
 		this.dir = opts.dir;
+		this.detectedType = opts.detectedType;
 	}
 
 	public parseMenuGraphics = (): WadMenuGraphic[] => {
+		if (this.detectedType !== WadDetectedType.DOOM) {
+			return [];
+		}
 		const spriteRanges: { start: number; end: number }[] = [];
 		const patchRanges: { start: number; end: number }[] = [];
 		const flatRanges: { start: number; end: number }[] = [];

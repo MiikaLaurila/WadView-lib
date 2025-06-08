@@ -18,6 +18,8 @@ import {
 	WadMapThingChex,
 	WadMapThingDoom,
 	WadMapThingHeretic,
+	WadMapThingHexen,
+	WadMapThingStrife,
 	type WadMapThingType,
 	type WadParserOptions,
 	type WadThing,
@@ -62,6 +64,10 @@ export class WadFileMapParser extends WadFileParser {
 				return WadMapThingChex[thingType] as WadMapThingType;
 			case WadDetectedType.HERETIC:
 				return WadMapThingHeretic[thingType] as WadMapThingType;
+			case WadDetectedType.HEXEN:
+				return WadMapThingHexen[thingType] as WadMapThingType;
+			case WadDetectedType.STRIFE:
+				return WadMapThingStrife[thingType] as WadMapThingType;
 			default:
 				return WadMapThingDoom[thingType] as WadMapThingType;
 		}

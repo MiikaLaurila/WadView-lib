@@ -659,6 +659,7 @@ export class WadFile {
 			dir: dir,
 			file: this.wadFile,
 			sendEvent: this.sendEvent,
+			detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
 		});
 		const menuGraphics = menuGraphicsParser.parseMenuGraphics();
 		await this.sendEvent(
@@ -694,6 +695,7 @@ export class WadFile {
 			dir: dir,
 			file: this.wadFile,
 			sendEvent: this.sendEvent,
+			detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
 		});
 		const music = await musicParser.parseMusic();
 		await this.sendEvent(
