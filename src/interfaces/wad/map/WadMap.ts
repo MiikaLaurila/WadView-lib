@@ -20,7 +20,6 @@ export enum MapFormat {
 }
 
 export const mapLumps = [
-	"TEXTMAP",
 	"HEADER",
 	"THINGS",
 	"LINEDEFS",
@@ -34,6 +33,10 @@ export const mapLumps = [
 	"BLOCKMAP",
 	"BEHAVIOR",
 	"SCRIPTS",
+	"TEXTMAP",
+	"DIALOGUE",
+	"ZNODES",
+	"ENDMAP",
 ] as const;
 export type MapLump = (typeof mapLumps)[number];
 export const isMapLump = (lumpName: unknown): lumpName is MapLump => {

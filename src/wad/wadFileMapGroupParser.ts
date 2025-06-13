@@ -1,10 +1,10 @@
 import {
-	type MapGroupDirectory,
+	LumpType,
 	type WadDirectory,
 	WadFileParser,
-	type WadMapGroupList,
+	type WadMapGroup,
 	type WadParserOptions,
-	isMapGroupDirectoryEntry,
+	isMapLump,
 } from "../index.js";
 
 interface WadMapGroupParserOptions extends WadParserOptions {
@@ -19,29 +19,29 @@ export class WadFileMapGroupParser extends WadFileParser {
 	}
 
 	public parseMapGroups = () => {
-		let currentGroup: MapGroupDirectory = [];
-		let currentMapName: string | null = null;
-		let mapGroups: WadMapGroupList = [];
-
-		this.directory.forEach((entry, idx, arr) => {
-			const isValid = isMapGroupDirectoryEntry(entry);
-			if (isValid && !currentMapName) {
-				currentMapName = arr[idx - 1].lumpName;
-				currentGroup.push(entry);
-			} else if (isValid && currentMapName) {
-				currentGroup.push(entry);
-			} else if ((!isValid || idx === arr.length - 1) && currentMapName) {
-				mapGroups.push({ name: currentMapName, lumps: currentGroup });
-				currentMapName = null;
-				currentGroup = [];
-			}
+		const mapGroups: WadMapGroup[] = [];
+		const mapMarkers = this.directory.filter((entry) => {
+			return entry.type === LumpType.MAPMARKER;
 		});
-
-		if (currentMapName) {
-			mapGroups.push({ name: currentMapName, lumps: currentGroup });
+		const mapNames = mapMarkers.map((m) => m.lumpName);
+		for (const mapName of mapNames) {
+			mapGroups.push({
+				name: mapName,
+				lumps: this.directory
+					.map((e) => {
+						if (isMapLump(e.lumpName) && e.mapName === mapName) {
+							return {
+								...e,
+								lumpName: e.lumpName,
+							};
+						}
+						return undefined;
+					})
+					.filter((e) => e !== undefined),
+			});
 		}
 
-		mapGroups = mapGroups.sort((a, b) => a.name.localeCompare(b.name));
+		mapGroups.sort((a, b) => a.name.localeCompare(b.name));
 		return mapGroups;
 	};
 }

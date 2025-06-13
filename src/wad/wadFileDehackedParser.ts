@@ -71,7 +71,10 @@ export class WadFileDehackedParser extends WadFileParser {
 
 		dehacked.parsed = this.parseDehString(dehacked.dehackedString);
 		dehacked.thingTranslations = dehacked.parsed.things.map((t) => {
-			if (t.bits?.includes(WadDehackedThingFlag.COUNTKILL) || t.hitPoints) {
+			if (
+				t.bits?.includes(WadDehackedThingFlag.COUNTKILL) ||
+				(t.hitPoints && !t.bits?.includes(WadDehackedThingFlag.NOBLOCKMAP))
+			) {
 				return {
 					from: t.id,
 					to: { name: t.name, group: WadMapThingGroup.MONSTER },
@@ -360,9 +363,7 @@ export class WadFileDehackedParser extends WadFileParser {
 				processingTextBlock = true;
 				expectedTextLength = oldLen + newLen;
 				textToProcess = "";
-			}
-			// Add similar detection for other block types...
-			else if (currentBlock) {
+			} else if (currentBlock) {
 				const [key, value] = this.parseKeyValue(trimmed);
 
 				switch (currentBlock) {
@@ -430,8 +431,6 @@ export class WadFileDehackedParser extends WadFileParser {
 						)
 							continue;
 						currentHelper.type = value;
-
-					// Add cases for other block types...
 				}
 			}
 		}

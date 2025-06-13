@@ -6,9 +6,11 @@ import type {
 	WadFlat,
 	WadHeader,
 	WadMapGroupList,
+	WadMapInfo,
 	WadMapList,
 	WadMenuGraphic,
 	WadMusic,
+	WadMusInfo,
 	WadPlaypal,
 	WadSprite,
 	WadTextures,
@@ -37,6 +39,8 @@ export interface Wad {
 	detectedType: WadDetectedType;
 	menuGraphics: WadMenuGraphic[];
 	music: WadMusic[];
+	mapInfo: WadMapInfo;
+	musInfo: WadMusInfo;
 }
 
 export const defaultWad: Readonly<Partial<Wad>> = {
@@ -54,4 +58,6 @@ export const defaultWad: Readonly<Partial<Wad>> = {
 	detectedType: undefined,
 	menuGraphics: undefined,
 	music: undefined,
+	mapInfo: undefined,
+	musInfo: undefined,
 };

@@ -1,47 +1,58 @@
-import { fileTypeFromBuffer } from "file-type";
 import {
-	WadDetectedType,
+	getWadMapInfoMusic,
+	getWadMapInfoNames,
+	LumpType,
 	type WadDirectory,
 	type WadDirectoryEntry,
+	WadFileMusInfoParser,
 	WadFileParser,
+	type WadMapInfo,
 	type WadMusic,
+	type WadMusInfo,
 	type WadParserOptions,
 } from "../index.js";
+import { doomMusicToNameMap } from "../interfaces/wad/WadMusic.js";
 
 interface WadFileMusicParserOptions extends WadParserOptions {
 	dir: WadDirectory;
-	detectedType: WadDetectedType;
+	mapInfo: WadMapInfo | null;
 }
 
 export class WadFileMusicParser extends WadFileParser {
 	private dir: WadDirectory;
-	private detectedType: WadDetectedType;
+	private mapInfo: WadMapInfo | null;
 	constructor(opts: WadFileMusicParserOptions) {
 		super(opts);
 		this.dir = opts.dir;
-		this.detectedType = opts.detectedType;
+		this.mapInfo = opts.mapInfo;
 	}
 
-	public parseMusic = async (): Promise<WadMusic[]> => {
-		const musicLumps: WadDirectoryEntry[] = [];
-		if (this.detectedType !== WadDetectedType.DOOM) {
-			return [];
-		}
-		const prefixes = ["D_", "H_", "O_"];
-		const blacklist = [""];
+	public parseMusic = async (): Promise<[WadMusic[], WadMusInfo | null]> => {
+		const musicLumps: WadDirectoryEntry[] = this.dir.filter(
+			(d) => d.type === LumpType.MUSIC,
+		);
 
-		for (const lump of this.dir) {
-			for (const prefix of prefixes) {
-				if (
-					lump.lumpName.startsWith(prefix) &&
-					!blacklist.includes(lump.lumpName)
-				) {
-					musicLumps.push(lump);
-				}
-			}
+		let musInfo: WadMusInfo | null = null;
+
+		const musInfoLump = this.dir.find((d) => d.type === LumpType.MUSINFO);
+
+		if (musInfoLump) {
+			const musInfoParser = new WadFileMusInfoParser({
+				file: this.file,
+				sendEvent: this.sendEvent,
+				musInfoLump,
+			});
+			musInfo = musInfoParser.parseMusInfo();
 		}
 
 		const musics: WadMusic[] = [];
+
+		const musicMap = this.mapInfo
+			? getWadMapInfoMusic(this.mapInfo)
+			: new Map();
+		const mapNameMap = this.mapInfo
+			? getWadMapInfoNames(this.mapInfo)
+			: new Map();
 
 		for (const musicLump of musicLumps) {
 			const data = new Uint8Array(
@@ -50,17 +61,30 @@ export class WadFileMusicParser extends WadFileParser {
 					musicLump.lumpLocation + musicLump.lumpSize,
 				),
 			);
-			let type = await fileTypeFromBuffer(data);
-			if (!type) {
-				const slice = data.slice(0, 3);
-				if (slice[0] === 77 && slice[1] === 85 && slice[2] === 83) {
-					type = { ext: "mus", mime: "audio/mus" };
+			let mapName = "";
+
+			const musicMapId = musicMap.get(musicLump.lumpName);
+			if (musicMapId) {
+				mapName = mapNameMap.get(musicMapId) ?? mapName;
+			}
+
+			if (
+				!mapName &&
+				musInfo?.musicToMap[musicLump.lumpName] &&
+				musInfo.musicToMap[musicLump.lumpName].length > 0
+			) {
+				if (mapNameMap) {
+					mapName = mapNameMap.get(musInfo.musicToMap[musicLump.lumpName][0]);
 				}
 			}
+
+			if (!mapName) mapName = doomMusicToNameMap[musicLump.lumpName];
+
 			musics.push({
 				name: musicLump.lumpName,
 				data,
-				type: type ?? { ext: "UNKNOWN", mime: "UNKNOWN" },
+				type: musicLump.musicType ?? { ext: "UNKNOWN", mime: "UNKNOWN" },
+				inMap: mapName ? mapName : musicLump.lumpName,
 			});
 		}
 
@@ -70,6 +94,6 @@ export class WadFileMusicParser extends WadFileParser {
 			return 0;
 		});
 
-		return musics;
+		return [musics, musInfo];
 	};
 }

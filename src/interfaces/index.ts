@@ -135,7 +135,11 @@ export {
 	WadDehackedToThingType,
 	defaultWadDehacked,
 } from "./wad/WadDehacked.js";
-export { WadDirectory, WadDirectoryEntry } from "./wad/WadDirectory.js";
+export {
+	WadDirectory,
+	WadDirectoryEntry,
+	LumpType,
+} from "./wad/WadDirectory.js";
 export { WadEndoom, WadEndoomChar, ANSIColors } from "./wad/WadEndoom.js";
 export { WadFileEvent } from "./wad/WadFileEvent.js";
 export { WadHeader, WadType, defaultWadHeader } from "./wad/WadHeader.js";
@@ -159,3 +163,26 @@ export {
 export { WadFileParser, WadParserOptions } from "./wad/WadParser.js";
 export { WadMenuGraphic } from "./wad/texture/WadMenuGraphic.js";
 export { WadMusic } from "./wad/WadMusic.js";
+export {
+	WadUMapInfo,
+	WadUMapInfoMap,
+	defaultWadUMapInfoMap,
+	WadDMapInfo,
+	WadDMapInfoMap,
+	WadDMapInfoEndSequence,
+	WadDMapInfoEpisode,
+	defaultWadDMapInfo,
+	defaultWadDMapInfoMap,
+	defaultWadDMapInfoEndSequence,
+	defaultWadDMapInfoEpisode,
+	WadMapZMapInfo,
+	WadMapZMapInfoMap,
+	defaultWadZMapInfo,
+	WadMapInfo,
+	WadMapInfoType,
+	getWadMapInfoNames,
+	getWadMapInfoMenuGraphics,
+	getWadMapInfoPatchNames,
+	getWadMapInfoMusic,
+} from "./wad/WadMapInfo.js";
+export { WadMusInfo } from "./wad/WadMusInfo.js";

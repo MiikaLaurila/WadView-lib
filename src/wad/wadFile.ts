@@ -9,8 +9,10 @@ import {
 	type WadFlat,
 	type WadHeader,
 	type WadMapGroupList,
+	type WadMapInfo,
 	type WadMapList,
 	type WadMenuGraphic,
+	type WadMusInfo,
 	type WadMusic,
 	type WadPlaypal,
 	type WadSprite,
@@ -307,17 +309,30 @@ export class WadFile {
 			sendEvent: this.sendEvent,
 			header,
 		});
-		const directory = directoryParser.parseDirectory();
+		const [directory, mapInfo] = await directoryParser.parseDirectory();
 		await this.sendEvent(
 			WadFileEvent.PARSED_COUNT,
 			`Parsed ${directory.length} lumps`,
 		);
 		this.setDirectory(directory);
+		this.setMapInfo(mapInfo);
 		return directory;
 	}
 
 	private setDirectory(dir: WadDirectory): void {
 		this._wadStruct.directory = dir;
+	}
+
+	public async mapInfo(): Promise<WadMapInfo | null> {
+		await this.directory();
+		if (this._wadStruct.mapInfo !== undefined) {
+			return this._wadStruct.mapInfo;
+		}
+		return null;
+	}
+
+	private setMapInfo(mapInfo: WadMapInfo | undefined): void {
+		this._wadStruct.mapInfo = mapInfo;
 	}
 
 	public async mapGroups(): Promise<WadMapGroupList | null> {
@@ -556,6 +571,7 @@ export class WadFile {
 			sendEvent: this.sendEvent,
 		});
 		const textures = texturesParser.parseTextures();
+
 		await this.sendEvent(
 			WadFileEvent.PARSED_COUNT,
 			`Parsed ${textures.texture1.length + textures.texture2.length} textures with ${Object.keys(textures.patches).length} patches`,
@@ -695,19 +711,34 @@ export class WadFile {
 			dir: dir,
 			file: this.wadFile,
 			sendEvent: this.sendEvent,
-			detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
+			mapInfo: await this.mapInfo(),
 		});
-		const music = await musicParser.parseMusic();
+		const [music, musInfo] = await musicParser.parseMusic();
 		await this.sendEvent(
 			WadFileEvent.PARSED_COUNT,
 			`Parsed ${music.length} music files`,
 		);
 
 		this.setMusic(music);
+		if (musInfo) {
+			this.setMusInfo(musInfo);
+		}
 		return music;
 	}
 
 	private setMusic(music: WadMusic[]): void {
 		this._wadStruct.music = music;
+	}
+
+	public async musInfo(): Promise<WadMusInfo | null> {
+		await this.music();
+		if (this._wadStruct.musInfo !== undefined) {
+			return this._wadStruct.musInfo;
+		}
+		return null;
+	}
+
+	private setMusInfo(musInfo: WadMusInfo): void {
+		this._wadStruct.musInfo = musInfo;
 	}
 }

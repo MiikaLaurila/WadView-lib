@@ -36,20 +36,20 @@ export class WadFilePatchParser extends WadFileParser {
 	};
 
 	public parsePatch = (patchLump: WadDirectoryEntry): WadPatch | null => {
+		const notPatchFormat = patchLump.imageType?.ext !== "patch";
+		if (notPatchFormat) {
+			console.log(
+				patchLump.lumpName,
+				`is a ${patchLump.imageType?.mime} file which are not supported`,
+			);
+			return null;
+		}
 		const view = new Uint8Array(
 			this.file.slice(
 				patchLump.lumpLocation,
 				patchLump.lumpLocation + patchLump.lumpSize,
 			),
 		);
-
-		const isPng =
-			JSON.stringify(Array.from(new Uint8Array(view.buffer.slice(1, 4)))) ===
-			JSON.stringify([80, 78, 71]);
-		if (isPng) {
-			console.log(patchLump.lumpName, "is a PNG file which are not supported");
-			return null;
-		}
 
 		const width = new Uint16Array(view.buffer.slice(0, 2))[0];
 		const height = new Uint16Array(view.buffer.slice(2, 4))[0];
@@ -69,7 +69,7 @@ export class WadFilePatchParser extends WadFileParser {
 		columnOffsets.forEach((colOffset, idx) => {
 			let endReached = false;
 			let viewPos = 0;
-			let watchDog = 100;
+			let watchDog = 1000;
 			let prevYOffset = -1;
 			columns.push([]);
 			while (!endReached && watchDog >= 0) {

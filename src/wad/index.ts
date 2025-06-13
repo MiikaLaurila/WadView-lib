@@ -12,4 +12,6 @@ export { WadFileSpritesParser } from "./wadFileSpritesParser.js";
 export { WadFileFlatsParser } from "./wadFileFlatsParser.js";
 export { WadFileMenuGraphicParser } from "./wadFileMenuGraphicParser.js";
 export { WadFileMusicParser } from "./wadFileMusicParser.js";
+export { WadFileMapInfoParser } from "./wadFileMapInfoParser.js";
+export { WadFileMusInfoParser } from "./wadFileMusInfoParser.js";
 export { WadFile } from "./wadFile.js";

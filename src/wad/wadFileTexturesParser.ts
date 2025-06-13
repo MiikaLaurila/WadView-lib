@@ -1,4 +1,5 @@
 import {
+	LumpType,
 	type WadDirectory,
 	type WadDirectoryEntry,
 	WadFileParser,
@@ -34,33 +35,19 @@ export class WadFileTexturesParser extends WadFileParser {
 			patches: {},
 		};
 
-		const tex1Lump = this.dir.find((l) => l.lumpName === texture1LumpName);
+		const tex1Lump = this.dir.find((l) => l.type === LumpType.TEXTURES1);
 		if (tex1Lump) textures.texture1 = this.parseTextureLump(tex1Lump);
 
-		const tex2Lump = this.dir.find((l) => l.lumpName === texture2LumpName);
+		const tex2Lump = this.dir.find((l) => l.type === LumpType.TEXTURES2);
 		if (tex2Lump) textures.texture2 = this.parseTextureLump(tex2Lump);
 
-		const pNamesLump = this.dir.find((l) => l.lumpName === pnamesLumpName);
+		const pNamesLump = this.dir.find((l) => l.type === LumpType.PNAMES);
 		if (pNamesLump) textures.patchNames = this.parsePnames(pNamesLump);
-
-		const patchesStart = this.dir.find((l) =>
-			l.lumpName.match(patchStartLumpMatcher),
-		);
-		const patchesEnd = this.dir.find((l) =>
-			l.lumpName.match(patchEndLumpMatcher),
-		);
-		if (!patchesStart || !patchesEnd) {
-			console.error("Failed to find patches start and end marker lumps");
-			return textures;
-		}
 
 		const patchLumps: WadDirectoryEntry[] = [];
 		for (const pname of textures.patchNames) {
 			const patchLump = this.dir.find(
-				(l) =>
-					l.lumpName === pname &&
-					l.lumpLocation > patchesStart.lumpLocation &&
-					l.lumpLocation < patchesEnd.lumpLocation,
+				(l) => l.lumpName === pname && l.type === LumpType.PATCH,
 			);
 			if (patchLump) {
 				patchLumps.push(patchLump);
