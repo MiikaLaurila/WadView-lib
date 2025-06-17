@@ -19,12 +19,14 @@ export interface WadDehacked {
 	dehackedString: string;
 	thingTranslations: Array<WadDehackedThingTranslation>;
 	parsed: WadDehackedFile;
+	source: string;
 }
 
 export const defaultWadDehacked: Readonly<WadDehacked> = {
 	dehackedString: "",
 	thingTranslations: [],
 	parsed: initialWadDehackedFile,
+	source: "",
 } as const;
 
 export const WadDehackedToThingType: Record<number, WadThing | null> = {

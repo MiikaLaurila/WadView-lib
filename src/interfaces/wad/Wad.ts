@@ -9,10 +9,11 @@ import type {
 	WadMapInfo,
 	WadMapList,
 	WadMenuGraphic,
-	WadMusic,
 	WadMusInfo,
+	WadMusic,
 	WadPlaypal,
 	WadSprite,
+	WadStbarGraphic,
 	WadTextures,
 } from "../index.js";
 
@@ -35,9 +36,10 @@ export interface Wad {
 	playpal: WadPlaypal;
 	colormap: WadColorMap;
 	endoom: WadEndoom;
-	dehacked: WadDehacked | null;
+	dehacked: WadDehacked;
 	detectedType: WadDetectedType;
 	menuGraphics: WadMenuGraphic[];
+	stbarGraphics: WadStbarGraphic[];
 	music: WadMusic[];
 	mapInfo: WadMapInfo;
 	musInfo: WadMusInfo;

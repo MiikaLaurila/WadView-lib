@@ -90,7 +90,10 @@ export class WadFileMapInfoParser extends WadFileParser {
 			}
 
 			if (line.toLowerCase().startsWith("map ")) {
-				const mapName = line.substring(4).trim();
+				let mapName = line.substring(4).trim();
+				if (mapName.endsWith("{")) {
+					mapName = mapName.substring(0, mapName.length - 2);
+				}
 				currentMap = { ...defaultWadUMapInfoMap, id: mapName.toUpperCase() };
 				inMapBlock = true;
 				continue;

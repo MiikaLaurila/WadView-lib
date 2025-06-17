@@ -1,1 +1,3 @@
-export type WadColorMap = number[][];
+export type WadColorMap = {
+	data: number[][];
+};

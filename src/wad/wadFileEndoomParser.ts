@@ -9,7 +9,7 @@ import {
 export class WadFileEndoomParser extends WadFileParser {
 	public parseEndoom = (): WadEndoom => {
 		if (this.lumps.length === 0 || this.lumps[0].lumpName !== endoomLumpName)
-			return [];
+			return { data: [] };
 
 		const endoomCharSize = 2;
 		const charCount = this.lumps[0].lumpSize / endoomCharSize;
@@ -20,7 +20,7 @@ export class WadFileEndoomParser extends WadFileParser {
 			),
 		);
 
-		const endoom: WadEndoom = [];
+		const endoom: WadEndoom = { data: [] };
 
 		for (let i = 0; i < charCount; i++) {
 			const viewStart = i * endoomCharSize;
@@ -33,7 +33,7 @@ export class WadFileEndoomParser extends WadFileParser {
 			const foregroundColor = ANSIColors[foregroundColorRaw];
 			const backgroundColor = ANSIColors[backgroundColorRaw];
 			const blink = colorStr.startsWith("1");
-			endoom.push({
+			endoom.data.push({
 				char,
 				foregroundColor,
 				backgroundColor,

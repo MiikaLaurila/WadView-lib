@@ -1,6 +1,5 @@
 import {
 	LumpType,
-	type WadDetectedType,
 	type WadDirectory,
 	WadFileParser,
 	WadFilePatchParser,
@@ -10,16 +9,13 @@ import {
 
 interface WadFileMenuGraphicParserOptions extends WadParserOptions {
 	dir: WadDirectory;
-	detectedType: WadDetectedType;
 }
 
 export class WadFileMenuGraphicParser extends WadFileParser {
 	private dir: WadDirectory;
-	private detectedType: WadDetectedType;
 	constructor(opts: WadFileMenuGraphicParserOptions) {
 		super(opts);
 		this.dir = opts.dir;
-		this.detectedType = opts.detectedType;
 	}
 
 	public parseMenuGraphics = (): WadMenuGraphic[] => {

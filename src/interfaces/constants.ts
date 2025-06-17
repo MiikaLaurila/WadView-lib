@@ -24,6 +24,8 @@ export const spriteMirroredFrameMatcher =
 	/^([A-Za-z0-9]{4})([A-Z])([0-9A-G])[A-Z]([0-9A-G])$/;
 
 export const mapNameMatcher = /^(E[1-9]M[1-9]|MAP[0-9]{1,2}|Map[0-9]{1,2})$/i;
+export const globalMapNameMatcher =
+	/(E[1-9]M[0-9]{1,2}|MAP[0-9]{1,2}|Map[0-9]{1,2})/;
 
 export const demoMatcher = /^DEMO[0-9]$/;
 

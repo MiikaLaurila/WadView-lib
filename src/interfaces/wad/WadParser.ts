@@ -1,6 +1,6 @@
 import type { WadDirectoryEntry, WadFileEvent } from "../index.js";
 
-type EventFunc = (type: WadFileEvent, msg?: string) => Promise<void>;
+export type EventFunc = (type: WadFileEvent, msg?: string) => Promise<void>;
 
 export interface WadParserOptions {
 	file: ArrayBuffer;

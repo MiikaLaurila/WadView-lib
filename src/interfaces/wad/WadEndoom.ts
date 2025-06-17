@@ -25,4 +25,6 @@ export type WadEndoomChar = {
 	foregroundColor: ANSIColor;
 	blink: boolean;
 };
-export type WadEndoom = WadEndoomChar[];
+export type WadEndoom = {
+	data: WadEndoomChar[];
+};

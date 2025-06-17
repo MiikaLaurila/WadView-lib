@@ -3,7 +3,7 @@ import { type WadColorMap, WadFileParser, colormapLumpName } from "../index.js";
 export class WadFileColormapParser extends WadFileParser {
 	public parseColormap = (): WadColorMap => {
 		if (this.lumps.length === 0 || this.lumps[0].lumpName !== colormapLumpName)
-			return [];
+			return { data: [] };
 		const colorMap = [];
 		const view = new Uint8Array(
 			this.file.slice(
@@ -23,6 +23,6 @@ export class WadFileColormapParser extends WadFileParser {
 			}
 			colorMap.push(colorMapArr);
 		}
-		return colorMap;
+		return { data: colorMap };
 	};
 }

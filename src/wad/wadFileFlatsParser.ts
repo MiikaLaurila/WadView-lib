@@ -1,4 +1,5 @@
 import {
+	LumpType,
 	type WadDirectory,
 	type WadDirectoryEntry,
 	WadFileParser,
@@ -20,21 +21,9 @@ export class WadFileFlatsParser extends WadFileParser {
 	}
 
 	public parseFlats = (): WadFlat[] => {
-		const flatLumps: WadDirectoryEntry[] = [];
-
-		let currentStart: WadDirectoryEntry | null = null;
-		for (const entry of this.dir) {
-			if (entry.lumpName.match(flatStartLumpMatcher)) {
-				currentStart = entry;
-				continue;
-			}
-			if (!entry.lumpName.match(flatEndLumpMatcher) && currentStart) {
-				flatLumps.push(entry);
-			}
-			if (entry.lumpName.match(flatEndLumpMatcher) && currentStart) {
-				currentStart = null;
-			}
-		}
+		const flatLumps: WadDirectoryEntry[] = this.dir.filter(
+			(d) => d.type === LumpType.FLAT,
+		);
 
 		const flats: WadFlat[] = [];
 		for (const flatLump of flatLumps) {

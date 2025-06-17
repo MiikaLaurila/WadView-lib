@@ -101,6 +101,7 @@ export class WadFileSpritesParser extends WadFileParser {
 			const existingSprite = sprites.find(
 				(sprite) => sprite.name === name && sprite.animation === animation,
 			);
+
 			if (!existingSprite) {
 				sprites.push({
 					name,

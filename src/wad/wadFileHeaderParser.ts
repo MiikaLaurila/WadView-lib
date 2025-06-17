@@ -15,7 +15,7 @@ export class WadFileHeaderParser extends WadFileParser {
 				WadFileEvent.NOT_WAD,
 				`This is not a wad file! ${type}`,
 			);
-			return null;
+			return undefined;
 		}
 		const directoryEntryCount: number = new Int32Array(
 			view.buffer.slice(4, 8),

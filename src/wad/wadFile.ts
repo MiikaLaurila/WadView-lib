@@ -4,10 +4,14 @@ import {
 	type WadDehacked,
 	WadDetectedType,
 	type WadDirectory,
+	type WadDirectoryEntry,
 	type WadEndoom,
 	WadFileEvent,
+	type WadFileInfo,
 	type WadFlat,
 	type WadHeader,
+	type WadMap,
+	type WadMapGroup,
 	type WadMapGroupList,
 	type WadMapInfo,
 	type WadMapList,
@@ -16,14 +20,26 @@ import {
 	type WadMusic,
 	type WadPlaypal,
 	type WadSprite,
+	type WadStbarGraphic,
 	type WadTextures,
 	colormapLumpName,
 	defaultWad,
+	defaultWadDehacked,
 	dehackedLumpName,
 	endoomLumpName,
 	playpalLumpName,
-	preFilledPlaypal,
 } from "../interfaces/index.js";
+import {
+	combineWadDehacked,
+	combineWadFlats,
+	combineWadMapInfos,
+	combineWadMenuStbarGraphics,
+	combineWadMusInfos,
+	combineWadMusic,
+	combineWadSprites,
+	combineWadTextures,
+} from "../utilities/index.js";
+
 import {
 	WadFileColormapParser,
 	WadFileDehackedParser,
@@ -37,6 +53,7 @@ import {
 	WadFileMusicParser,
 	WadFilePlaypalParser,
 	WadFileSpritesParser,
+	WadFileStbarGraphicParser,
 	WadFileTexturesParser,
 	type WadMapParsingOptions,
 } from "./index.js";
@@ -54,12 +71,19 @@ interface WadFileOptions {
 	mapOpts?: WadMapParsingOptions;
 }
 export class WadFile {
-	private _fileUrl = "";
+	private _fileUrls: string[] = [];
 	private _wadLoaded = false;
 	private _wadLoadAttempted = false;
 	private _wadLoadError = "";
-	private _wadFile: ArrayBuffer = new ArrayBuffer(0);
-	private _wadStruct: Partial<Wad> = JSON.parse(JSON.stringify(defaultWad));
+	private _wadFiles: ArrayBuffer[] = [new ArrayBuffer(0)];
+	private _wadStructs: Partial<Wad>[] = [
+		JSON.parse(JSON.stringify(defaultWad)),
+	];
+	private _dehFile: ArrayBuffer | undefined = undefined;
+	private _dehStruct: WadDehacked = JSON.parse(
+		JSON.stringify(defaultWadDehacked),
+	);
+	private _wadName = "";
 	private readonly _internalLog: LogMessage[] = [];
 	private readonly _eventSink?: (evt: WadFileEvent, msg?: string) => void =
 		undefined;
@@ -80,8 +104,8 @@ export class WadFile {
 			this.sendEvent(WadFileEvent.MISSING_READYCB, msg);
 		}
 		if (opts.fileUrl !== undefined && opts.readyCb !== undefined) {
-			this._fileUrl = opts.fileUrl;
-			this.loadFileFromUrl(this._fileUrl, opts.readyCb);
+			this._fileUrls = [opts.fileUrl];
+			this.loadFileFromUrl(this._fileUrls[0], opts.readyCb);
 		}
 	}
 
@@ -108,15 +132,17 @@ export class WadFile {
 		return this._internalLog;
 	}
 
-	get fileUrl(): string {
-		return this._fileUrl;
+	get fileUrls(): string[] {
+		return this._fileUrls;
 	}
 
-	get niceFileName(): string {
-		const removeWad = this._fileUrl.split(/[.]WAD/i)[0];
-		const afterSlash = removeWad.split("/").pop();
-		if (afterSlash) return afterSlash;
-		return removeWad;
+	get niceFileNames(): string[] {
+		return this.fileUrls.map((s) => {
+			const removeWad = s.split(/[.]WAD/i)[0];
+			const afterSlash = removeWad.split("/").pop();
+			if (afterSlash) return afterSlash;
+			return removeWad;
+		});
 	}
 
 	get wadLoaded(): boolean {
@@ -143,22 +169,29 @@ export class WadFile {
 		this._wadLoadError = errMsg;
 	}
 
-	private get wadFile(): ArrayBuffer {
-		return this._wadFile;
+	private get wadFiles(): ArrayBuffer[] {
+		return this._wadFiles;
 	}
 
-	private set wadFile(file: ArrayBuffer) {
-		this._wadFile = file;
+	private set wadFiles(files: ArrayBuffer[]) {
+		this._wadFiles = files;
 	}
 
-	get wadFileLength(): number {
-		return this._wadFile.byteLength;
+	get wadFileLengths(): number[] {
+		return this._wadFiles.map((f) => f.byteLength);
 	}
 
 	private get fileLoaded(): boolean {
 		return (
-			this.wadLoadAttempted && this.wadLoaded && this.wadFile.byteLength > 0
+			this.wadLoadAttempted &&
+			this.wadLoaded &&
+			this.wadFiles.length > 0 &&
+			this.wadFiles[0].byteLength > 0
 		);
+	}
+
+	get wadName(): string {
+		return this._wadName;
 	}
 
 	public loadFile(
@@ -166,14 +199,14 @@ export class WadFile {
 		callback?: (success: boolean, err?: string) => void,
 	): void {
 		this.wadLoadAttempted = true;
-		this._wadStruct = JSON.parse(JSON.stringify(defaultWad));
-		this._fileUrl = file.name;
-		this._wadFile = new ArrayBuffer(0);
+		this._wadStructs = [JSON.parse(JSON.stringify(defaultWad))];
+		this._fileUrls = [file.name];
+		this._wadFiles = [new ArrayBuffer(0)];
 		try {
 			file
 				.arrayBuffer()
 				.then((buf) => {
-					this.wadFile = buf;
+					this.wadFiles = [buf];
 					this.wadLoaded = true;
 					void this.sendEvent(WadFileEvent.FILE_LOADED);
 					if (callback !== undefined) callback(true);
@@ -196,11 +229,53 @@ export class WadFile {
 		callback?: (success: boolean, err?: string) => void,
 	): void {
 		this.wadLoadAttempted = true;
-		this._wadStruct = JSON.parse(JSON.stringify(defaultWad));
-		this._fileUrl = fileName;
-		this.wadFile = file;
+		this._wadStructs = [JSON.parse(JSON.stringify(defaultWad))];
+		this._fileUrls = [fileName];
+		this.wadFiles = [file];
 		this.wadLoaded = true;
-		void this.sendEvent(WadFileEvent.FILE_LOADED);
+		void this.sendEvent(WadFileEvent.FILE_LOADED, `Loaded ${fileName}`);
+		if (callback !== undefined) callback(true);
+	}
+
+	public loadArrayBuffers(
+		files: ArrayBuffer[],
+		fileNames: string[],
+		wadName: string,
+		callback?: (success: boolean, err?: string) => void,
+	): void {
+		const wadFiles = Array.from(fileNames)
+			.map((f, idx) => {
+				if (f.toLowerCase().endsWith(".wad")) {
+					return files[idx];
+				}
+				return undefined;
+			})
+			.filter((f) => f !== undefined);
+
+		const dehFiles = Array.from(fileNames)
+			.map((f, idx) => {
+				if (f.toLowerCase().endsWith(".deh")) {
+					return files[idx];
+				}
+				return undefined;
+			})
+			.filter((f) => f !== undefined);
+
+		this.wadLoadAttempted = true;
+		this._wadStructs = [];
+		for (let i = 0; i < wadFiles.length; i++) {
+			this._wadStructs.push(JSON.parse(JSON.stringify(defaultWad)));
+		}
+		this._fileUrls = fileNames.filter((f) => f.toLowerCase().endsWith(".wad"));
+		this.wadFiles = wadFiles;
+		this._dehFile = dehFiles.length > 0 ? dehFiles[0] : this._dehFile;
+		this._dehStruct = JSON.parse(JSON.stringify(defaultWadDehacked));
+		this.wadLoaded = true;
+		this._wadName = wadName;
+		void this.sendEvent(
+			WadFileEvent.FILE_LOADED,
+			`Loaded ${fileNames.join(", ")}`,
+		);
 		if (callback !== undefined) callback(true);
 	}
 
@@ -209,13 +284,13 @@ export class WadFile {
 		callback?: (success: boolean, err?: string) => void,
 	): void {
 		this.wadLoadAttempted = true;
-		this._wadStruct = JSON.parse(JSON.stringify(defaultWad));
-		this._fileUrl = fileUrl;
-		this._wadFile = new ArrayBuffer(0);
+		this._wadStructs = [JSON.parse(JSON.stringify(defaultWad))];
+		this._fileUrls = [fileUrl];
+		this._wadFiles = [new ArrayBuffer(0)];
 		fetch(fileUrl)
 			.then(async (res) => {
 				try {
-					this.wadFile = await res.arrayBuffer();
+					this.wadFiles = [await res.arrayBuffer()];
 					this.wadLoaded = true;
 					void this.sendEvent(WadFileEvent.FILE_LOADED);
 					if (callback !== undefined) callback(true);
@@ -232,513 +307,897 @@ export class WadFile {
 			});
 	}
 
-	public async header(): Promise<WadHeader | null> {
+	// biome-ignore lint/suspicious/noExplicitAny: Can't find a solution to this
+	private async parseForAllWads<T extends any[], K>(
+		props: (keyof Wad)[],
+		requirements: () => Promise<K>,
+		parserFn: (idx: number, reqs: K) => Promise<T | undefined>,
+	): Promise<{ [I in keyof T]: T[I] | undefined }[]> {
+		const reqs = await requirements();
+		const results: { [I in keyof T]: T[I] | undefined }[] = [];
+
+		for (let idx = 0; idx < this._wadFiles.length; idx++) {
+			let result: (T[number] | undefined)[] = [];
+			for (let propIdx = 0; propIdx < props.length; propIdx++) {
+				const prop = props[propIdx];
+				const struct = this._wadStructs[idx];
+				result.push(struct?.[prop]);
+			}
+			if (result.includes(undefined)) {
+				result = [];
+				const parseRes = await parserFn(idx, reqs);
+
+				if (parseRes) {
+					result.push(...parseRes);
+				} else {
+					result.push(...Array(props.length).fill(undefined));
+				}
+			}
+			results.push(result as { [I in keyof T]: T[I] | undefined });
+		}
+		return results;
+	}
+
+	private async generateWadFileInfos<T>(
+		data: (T | undefined)[],
+		wadFileNames: string[],
+	): Promise<WadFileInfo<T>[]> {
+		return data
+			.map((h, idx) => {
+				if (!h) return;
+				return {
+					wadFileName: wadFileNames[idx],
+					wadIdx: idx,
+					...h,
+				};
+			})
+			.filter((d) => d !== undefined);
+	}
+
+	private async headers(): Promise<(WadHeader | undefined)[]> {
 		if (!this.fileLoaded) {
-			return null;
+			return this._wadStructs.map((s) => undefined);
 		}
-		if (this._wadStruct.header !== undefined) {
-			return this._wadStruct.header;
+
+		if (this._wadStructs.every((w) => w.header)) {
+			return this._wadStructs.map((w) => w.header);
 		}
-		await this.sendEvent(
-			WadFileEvent.HEADER_PARSING,
-			`Header parsing for ${this._fileUrl}`,
+
+		const result = await this.parseForAllWads<[WadHeader], null>(
+			["header"],
+			async () => null,
+			async (idx, _) => {
+				await this.sendEvent(
+					WadFileEvent.HEADER_PARSING,
+					`Header parsing for ${this._fileUrls[idx]}`,
+				);
+				const headerParser = new WadFileHeaderParser({
+					file: this._wadFiles[idx],
+					sendEvent: this.sendEvent,
+				});
+				const res = headerParser.parseHeader();
+				return res ? [res] : undefined;
+			},
 		);
-		const headerParser = new WadFileHeaderParser({
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
+
+		const headers = result.map((r) => r[0]);
+
+		this.setHeaders(headers);
+		return headers;
+	}
+
+	private setHeaders(headers: (WadHeader | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.header = headers[idx];
 		});
-		const header = headerParser.parseHeader();
-		if (header) this.setHeader(header);
-		return header;
 	}
 
-	private setHeader(header: WadHeader): void {
-		this._wadStruct.header = header;
+	public async header(): Promise<WadFileInfo<WadHeader>[]> {
+		return await this.generateWadFileInfos<WadHeader>(
+			await this.headers(),
+			this.niceFileNames,
+		);
 	}
 
-	public async detectedType(): Promise<WadDetectedType | null> {
+	private async detectedTypes(): Promise<(WadDetectedType | undefined)[]> {
 		if (!this.fileLoaded) {
-			return null;
+			return [undefined];
 		}
-		if (this._wadStruct.detectedType !== undefined) {
-			return this._wadStruct.detectedType;
+		if (this._wadStructs.every((s) => s.detectedType)) {
+			return this._wadStructs.map((s) => s.detectedType);
 		}
 
-		const fileNameCheck = this.niceFileName.toLowerCase();
+		const detectedTypes: WadDetectedType[] = [];
+		for (const niceFileName of this.niceFileNames) {
+			const fileNameCheck = niceFileName.toLowerCase();
 
-		let currentDetectType = WadDetectedType.DOOM;
+			let currentDetectType = WadDetectedType.DOOM;
 
-		if (fileNameCheck.includes("heretic"))
-			currentDetectType = WadDetectedType.HERETIC;
+			if (fileNameCheck.includes("heretic"))
+				currentDetectType = WadDetectedType.HERETIC;
 
-		if (fileNameCheck.includes("hexen"))
-			currentDetectType = WadDetectedType.HEXEN;
+			if (fileNameCheck.includes("hexen"))
+				currentDetectType = WadDetectedType.HEXEN;
 
-		if (fileNameCheck.includes("chex"))
-			currentDetectType = WadDetectedType.CHEX;
+			if (fileNameCheck.includes("chex"))
+				currentDetectType = WadDetectedType.CHEX;
 
-		if (fileNameCheck.includes("strife"))
-			currentDetectType = WadDetectedType.STRIFE;
+			if (fileNameCheck.includes("strife"))
+				currentDetectType = WadDetectedType.STRIFE;
 
-		await this.sendEvent(
-			WadFileEvent.DETECTED_TYPE_SET,
-			`Set detected WAD type to ${currentDetectType}`,
-		);
-		this.setDetectedType(currentDetectType);
-		return currentDetectType;
+			await this.sendEvent(
+				WadFileEvent.DETECTED_TYPE_SET,
+				`Set detected WAD type of ${niceFileName} to ${currentDetectType}`,
+			);
+			detectedTypes.push(currentDetectType);
+		}
+		this.setDetectedTypes(detectedTypes);
+		return detectedTypes;
 	}
 
-	private setDetectedType(detectedType: WadDetectedType): void {
-		this._wadStruct.detectedType = detectedType;
-	}
-
-	public async directory(): Promise<WadDirectory | null> {
-		const header = await this.header();
-		if (header === null) {
-			return null;
-		}
-		if (this._wadStruct.directory !== undefined) {
-			return this._wadStruct.directory;
-		}
-		await this.sendEvent(
-			WadFileEvent.DIRECTORY_PARSING,
-			`Directory parsing for ${this._fileUrl}`,
-		);
-		const directoryParser = new WadFileDirectoryParser({
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-			header,
+	private setDetectedTypes(detectedTypes: WadDetectedType[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.detectedType = detectedTypes[idx];
 		});
-		const [directory, mapInfo] = await directoryParser.parseDirectory();
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${directory.length} lumps`,
+	}
+
+	public async detectedType(): Promise<WadFileInfo<WadDetectedType>[]> {
+		return await this.generateWadFileInfos<WadDetectedType>(
+			await this.detectedTypes(),
+			this.niceFileNames,
 		);
-		this.setDirectory(directory);
-		this.setMapInfo(mapInfo);
-		return directory;
 	}
 
-	private setDirectory(dir: WadDirectory): void {
-		this._wadStruct.directory = dir;
-	}
-
-	public async mapInfo(): Promise<WadMapInfo | null> {
-		await this.directory();
-		if (this._wadStruct.mapInfo !== undefined) {
-			return this._wadStruct.mapInfo;
-		}
-		return null;
-	}
-
-	private setMapInfo(mapInfo: WadMapInfo | undefined): void {
-		this._wadStruct.mapInfo = mapInfo;
-	}
-
-	public async mapGroups(): Promise<WadMapGroupList | null> {
-		const dir = await this.directory();
-
-		if (dir === null) {
-			return null;
+	private async directories(): Promise<(WadDirectory | undefined)[]> {
+		if (this._wadStructs.every((w) => w.directory)) {
+			return this._wadStructs.map((w) => w.directory);
 		}
 
-		if (this._wadStruct.mapGroups !== undefined) {
-			return this._wadStruct.mapGroups;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.MAPGROUPS_PARSING,
-			`MapGroups parsing for ${this._fileUrl}`,
+		const result = await this.parseForAllWads<
+			[WadDirectory, WadMapInfo | undefined],
+			(WadHeader | undefined)[]
+		>(
+			["directory", "mapInfo"],
+			async () => {
+				return await this.headers();
+			},
+			async (idx, headers) => {
+				await this.sendEvent(
+					WadFileEvent.DIRECTORY_PARSING,
+					`Directory parsing for ${this._fileUrls[idx]}`,
+				);
+				if (headers[idx]) {
+					const directoryParser = new WadFileDirectoryParser({
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+						header: headers[idx],
+					});
+					const [directory, mapInfo] = await directoryParser.parseDirectory();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${directory.length} lumps`,
+					);
+					return [directory, mapInfo];
+				}
+				return undefined;
+			},
 		);
 
-		const mapGroupParser = new WadFileMapGroupParser({
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-			directory: dir,
+		const directories = result.map((r) => r[0]);
+		const mapInfos = result.map((r) => r[1]);
+
+		this.setDirectories(directories);
+		this.setMapInfos(mapInfos);
+		return directories;
+	}
+
+	private setDirectories(dirs: (WadDirectory | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.directory = dirs[idx];
 		});
-		const mapGroups = mapGroupParser.parseMapGroups();
+	}
+
+	public async directory(): Promise<WadFileInfo<WadDirectoryEntry>[]> {
+		const rawDirs = (await this.directories()).filter((d) => d !== undefined);
+
+		return (
+			await this.generateWadFileInfos<{ data: WadDirectory }>(
+				rawDirs.map((d) => {
+					return { data: d };
+				}),
+				this.niceFileNames,
+			)
+		).flatMap((e) => {
+			return e.data.map((d) => {
+				return {
+					...d,
+					wadIdx: e.wadIdx,
+					wadFileName: e.wadFileName,
+				} as WadFileInfo<WadDirectoryEntry>;
+			});
+		});
+	}
+
+	private async mapInfos(): Promise<(WadMapInfo | undefined)[]> {
+		await this.directories();
+		return this._wadStructs.map((s) => s.mapInfo);
+	}
+
+	private setMapInfos(mapInfos: (WadMapInfo | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.mapInfo = mapInfos[idx];
+		});
+	}
+
+	public async mapInfo(): Promise<WadMapInfo> {
+		const mapInfos = (await this.mapInfos()).filter((d) => d !== undefined);
+		return combineWadMapInfos(mapInfos);
+	}
+
+	private async mapGroupLists(): Promise<(WadMapGroupList | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadMapGroupList],
+			(WadDirectory | undefined)[]
+		>(
+			["mapGroups"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.MAPGROUPS_PARSING,
+						`MapGroups parsing for ${this._fileUrls[idx]}`,
+					);
+
+					const mapGroupParser = new WadFileMapGroupParser({
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+						directory: dirs[idx],
+					});
+					return [mapGroupParser.parseMapGroups()];
+				}
+				return undefined;
+			},
+		);
+
+		const mapGroups = result.map((r) => r[0]);
 
 		this.setMapGroups(mapGroups);
 		return mapGroups;
 	}
 
-	private setMapGroups(groups: WadMapGroupList): void {
-		this._wadStruct.mapGroups = groups;
+	private setMapGroups(groups: (WadMapGroupList | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.mapGroups = groups[idx];
+		});
 	}
 
-	public async maps(): Promise<WadMapList | null> {
-		const mapGroups = await this.mapGroups();
+	public async mapGroups(): Promise<WadFileInfo<WadMapGroup>[]> {
+		const mapGroups = (await this.mapGroupLists())
+			.filter((d) => d !== undefined)
+			.flat();
 
-		if (mapGroups === null) {
-			return null;
-		}
+		return await this.generateWadFileInfos<WadMapGroup>(
+			mapGroups,
+			this.niceFileNames,
+		);
+	}
 
-		if (this._wadStruct.maps !== undefined) {
-			return this._wadStruct.maps;
-		}
+	private async mapsLists(): Promise<(WadMapList | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadMapList],
+			(WadMapGroupList | undefined)[]
+		>(
+			["maps"],
+			async () => {
+				return await this.mapGroupLists();
+			},
+			async (idx, mapGroupsList) => {
+				if (mapGroupsList[idx]) {
+					await this.sendEvent(
+						WadFileEvent.MAPS_PARSING,
+						`Maps parsing for ${this._fileUrls[idx]}`,
+					);
 
-		await this.sendEvent(
-			WadFileEvent.MAPS_PARSING,
-			`Maps parsing for ${this._fileUrl}`,
+					const maps: WadMapList = [];
+					for (let i = 0; i < mapGroupsList[idx].length; i++) {
+						const mapGroup = mapGroupsList[idx][i];
+						const mapParser = new WadFileMapParser({
+							...this.mapOpts,
+							lumps: mapGroup.lumps,
+							mapName: mapGroup.name,
+							file: this._wadFiles[idx],
+							sendEvent: this.sendEvent,
+							detectedType:
+								(await this.detectedType())[idx] ?? WadDetectedType.DOOM,
+						});
+						const map = await mapParser.parseMap();
+						maps.push(map);
+					}
+
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${maps.length} maps`,
+					);
+					return [maps];
+				}
+				return undefined;
+			},
 		);
 
-		const maps: WadMapList = [];
-		for (let i = 0; i < mapGroups.length; i++) {
-			const mapGroup = mapGroups[i];
-			const mapParser = new WadFileMapParser({
-				...this.mapOpts,
-				lumps: mapGroup.lumps,
-				mapName: mapGroup.name,
-				file: this.wadFile,
-				sendEvent: this.sendEvent,
-				detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
-			});
-			const map = await mapParser.parseMap();
-			maps.push(map);
-		}
-
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${maps.length} maps`,
-		);
+		const maps = result.map((r) => r[0]);
 
 		this.setMaps(maps);
 		return maps;
 	}
 
-	private setMaps(maps: WadMapList): void {
-		this._wadStruct.maps = maps;
+	private setMaps(maps: (WadMapList | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.maps = maps[idx];
+		});
 	}
 
-	public async playpal(): Promise<WadPlaypal | null> {
-		const dir = await this.directory();
+	public async maps(): Promise<WadFileInfo<WadMap>[]> {
+		const maps = (await this.mapsLists()).filter((d) => d !== undefined).flat();
+		return await this.generateWadFileInfos<WadMap>(maps, this.niceFileNames);
+	}
 
-		if (dir === null) {
-			return null;
-		}
+	private async playpals(): Promise<(WadPlaypal | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadPlaypal],
+			(WadDirectory | undefined)[]
+		>(
+			["playpal"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.PLAYPAL_PARSING,
+						`Playpal parsing for ${this._fileUrls[idx]}`,
+					);
 
-		if (this._wadStruct.playpal !== undefined) {
-			return this._wadStruct.playpal;
-		}
-		await this.sendEvent(
-			WadFileEvent.PLAYPAL_PARSING,
-			`Playpal parsing for ${this._fileUrl}`,
+					const playPalLump = dirs[idx].find(
+						(e) => e.lumpName === playpalLumpName,
+					);
+					if (playPalLump === undefined) {
+						return undefined;
+					}
+
+					const playpalParser = new WadFilePlaypalParser({
+						lumps: [playPalLump],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					return [playpalParser.parsePlaypal()];
+				}
+				return undefined;
+			},
 		);
 
-		const playPalLump = dir.find((e) => e.lumpName === playpalLumpName);
-		if (playPalLump === undefined) {
-			this.setPlaypal(preFilledPlaypal);
-			return preFilledPlaypal;
-		}
+		const playpals = result.map((r) => r[0]);
 
-		const playpalParser = new WadFilePlaypalParser({
-			lumps: [playPalLump],
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
+		this.setPlaypals(playpals);
+		return playpals;
+	}
+
+	private setPlaypals(playpals: (WadPlaypal | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.playpal = playpals[idx];
 		});
-		const playpal = playpalParser.parsePlaypal();
-
-		this.setPlaypal(playpal);
-		return playpal;
 	}
 
-	private setPlaypal(playpal: WadPlaypal): void {
-		this._wadStruct.playpal = playpal;
+	public async playpal(): Promise<WadFileInfo<WadPlaypal>[]> {
+		return await this.generateWadFileInfos<WadPlaypal>(
+			await this.playpals(),
+			this.niceFileNames,
+		);
 	}
 
-	public async colormap(): Promise<WadColorMap | null> {
-		const dir = await this.directory();
+	private async colormaps(): Promise<(WadColorMap | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadColorMap],
+			(WadDirectory | undefined)[]
+		>(
+			["colormap"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					const colormapLump = dirs[idx].find(
+						(e) => e.lumpName === colormapLumpName,
+					);
+					if (colormapLump === undefined) {
+						return undefined;
+					}
+					await this.sendEvent(
+						WadFileEvent.COLORMAP_PARSING,
+						`ColorMap parsing for ${this._fileUrls[idx]}`,
+					);
 
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.colormap !== undefined) {
-			return this._wadStruct.colormap;
-		}
-
-		const colormapLump = dir.find((e) => e.lumpName === colormapLumpName);
-		if (colormapLump === undefined) {
-			return null;
-		}
-		await this.sendEvent(
-			WadFileEvent.COLORMAP_PARSING,
-			`ColorMap parsing for ${this._fileUrl}`,
+					const colormapParser = new WadFileColormapParser({
+						lumps: [colormapLump],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					return [colormapParser.parseColormap()];
+				}
+				return undefined;
+			},
 		);
 
-		const colormapParser = new WadFileColormapParser({
-			lumps: [colormapLump],
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
+		const colormaps = result.map((r) => r[0]);
+
+		this.setColormaps(colormaps);
+		return colormaps;
+	}
+
+	private setColormaps(colormaps: (WadColorMap | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.colormap = colormaps[idx];
 		});
-		const colormap = colormapParser.parseColormap();
-
-		this.setColormap(colormap);
-		return colormap;
 	}
 
-	private setColormap(colorMap: WadColorMap): void {
-		this._wadStruct.colormap = colorMap;
-	}
-
-	public async endoom(): Promise<WadEndoom | null> {
-		const dir = await this.directory();
-
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.endoom !== undefined) {
-			return this._wadStruct.endoom;
-		}
-
-		const endoomLump = dir.find((e) => e.lumpName === endoomLumpName);
-		if (endoomLump === undefined) {
-			return null;
-		}
-		await this.sendEvent(
-			WadFileEvent.ENDOOM_PARSING,
-			`Endoom parsing for ${this._fileUrl}`,
+	public async colormap(): Promise<WadFileInfo<WadColorMap>[]> {
+		return await this.generateWadFileInfos<WadColorMap>(
+			await this.colormaps(),
+			this.niceFileNames,
 		);
-		const endoomParser = new WadFileEndoomParser({
-			lumps: [endoomLump],
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
+	}
+
+	private async endooms(): Promise<(WadEndoom | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadEndoom],
+			(WadDirectory | undefined)[]
+		>(
+			["endoom"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					const endoomLump = dirs[idx].find(
+						(e) => e.lumpName === endoomLumpName,
+					);
+					if (endoomLump === undefined) {
+						return undefined;
+					}
+					await this.sendEvent(
+						WadFileEvent.ENDOOM_PARSING,
+						`Endoom parsing for ${this._fileUrls[idx]}`,
+					);
+					const endoomParser = new WadFileEndoomParser({
+						lumps: [endoomLump],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					return [endoomParser.parseEndoom()];
+				}
+				return undefined;
+			},
+		);
+
+		const endooms = result.map((r) => r[0]);
+
+		this.setEndooms(endooms);
+		return endooms;
+	}
+
+	private setEndooms(endooms: (WadEndoom | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.endoom = endooms[idx];
 		});
-		const endoom = endoomParser.parseEndoom();
-
-		this.setEndoom(endoom);
-		return endoom;
 	}
 
-	private setEndoom(endoom: WadEndoom): void {
-		this._wadStruct.endoom = endoom;
+	public async endoom(): Promise<WadFileInfo<WadEndoom>[]> {
+		return await this.generateWadFileInfos<WadEndoom>(
+			await this.endooms(),
+			this.niceFileNames,
+		);
 	}
 
-	public async dehacked(): Promise<WadDehacked | null> {
-		const dir = await this.directory();
+	private async dehackeds(): Promise<(WadDehacked | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadDehacked],
+			(WadDirectory | undefined)[]
+		>(
+			["dehacked"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					const dehackedLump = dirs[idx].find(
+						(e) => e.lumpName === dehackedLumpName,
+					);
+					if (dehackedLump === undefined) {
+						return undefined;
+					}
+					await this.sendEvent(
+						WadFileEvent.DEHACKED_PARSING,
+						`Dehacked parsing for ${this._fileUrls[idx]}`,
+					);
+					const dehackedParser = new WadFileDehackedParser({
+						lumps: [dehackedLump],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+						fileName: this.fileUrls[idx],
+					});
+					return [dehackedParser.parseDehacked()];
+				}
+				return undefined;
+			},
+		);
 
-		if (dir === null) {
-			return null;
+		const dehackeds = result.map((r) => r[0]);
+
+		this.setDehackeds(dehackeds);
+		return dehackeds;
+	}
+
+	private setDehackeds(dehackeds: (WadDehacked | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.dehacked = dehackeds[idx];
+		});
+	}
+
+	private async dehackedExternal(): Promise<WadDehacked | undefined> {
+		if (!this._dehFile) {
+			return undefined;
 		}
-
-		if (this._wadStruct.dehacked !== undefined) {
-			return this._wadStruct.dehacked;
-		}
-
-		const dehackedLump = dir.find((e) => e.lumpName === dehackedLumpName);
-		if (dehackedLump === undefined) {
-			return null;
+		if (this._dehStruct.dehackedString) {
+			return this._dehStruct;
 		}
 		await this.sendEvent(
 			WadFileEvent.DEHACKED_PARSING,
-			`Dehacked parsing for ${this._fileUrl}`,
+			"Dehacked parsing from external DEH file",
 		);
 		const dehackedParser = new WadFileDehackedParser({
-			lumps: [dehackedLump],
-			file: this.wadFile,
+			lumps: [],
 			sendEvent: this.sendEvent,
+			dehackedBuffer: this._dehFile,
 		});
 		const dehacked = dehackedParser.parseDehacked();
-
-		this.setDehacked(dehacked);
+		this.setDehackedExternal(dehacked);
 		return dehacked;
 	}
 
-	private setDehacked(dehacked: WadDehacked | null): void {
-		this._wadStruct.dehacked = dehacked;
+	private setDehackedExternal(dehacked: WadDehacked): void {
+		this._dehStruct = dehacked;
 	}
 
-	public async textures(): Promise<WadTextures | null> {
-		const dir = await this.directory();
+	public async dehacked(): Promise<WadDehacked> {
+		const parsedDehs = await this.dehackeds();
+		const externalDeh = await this.dehackedExternal();
+		const allDehs = [...parsedDehs, externalDeh].filter((d) => d !== undefined);
+		return combineWadDehacked(allDehs);
+	}
 
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.textures !== undefined) {
-			return this._wadStruct.textures;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.TEXTURES_PARSING,
-			`Textures parsing for ${this._fileUrl}`,
+	private async texturesList(): Promise<(WadTextures | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadTextures],
+			(WadDirectory | undefined)[]
+		>(
+			["textures"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.TEXTURES_PARSING,
+						`Textures parsing for ${this._fileUrls[idx]}`,
+					);
+					const texturesParser = new WadFileTexturesParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					const parsedTextures = texturesParser.parseTextures();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${parsedTextures.texture1.length + parsedTextures.texture2.length} textures with ${Object.keys(parsedTextures.patches).length} patches`,
+					);
+					return [parsedTextures];
+				}
+				return undefined;
+			},
 		);
-		const texturesParser = new WadFileTexturesParser({
-			lumps: [],
-			dir: dir,
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-		});
-		const textures = texturesParser.parseTextures();
 
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${textures.texture1.length + textures.texture2.length} textures with ${Object.keys(textures.patches).length} patches`,
-		);
+		const textures = result.map((r) => r[0]);
 
 		this.setTextures(textures);
 		return textures;
 	}
 
-	private setTextures(textures: WadTextures): void {
-		this._wadStruct.textures = textures;
+	private setTextures(textures: (WadTextures | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.textures = textures[idx];
+		});
 	}
 
-	public async flats(): Promise<WadFlat[] | null> {
-		const dir = await this.directory();
+	public async textures(): Promise<WadTextures> {
+		const textures = (await this.texturesList()).filter((d) => d !== undefined);
+		return combineWadTextures(textures);
+	}
 
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.flats !== undefined) {
-			return this._wadStruct.flats;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.FLATS_PARSING,
-			`Flats parsing for ${this._fileUrl}`,
+	private async flatsList(): Promise<(WadFlat[] | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadFlat[]],
+			(WadDirectory | undefined)[]
+		>(
+			["flats"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.FLATS_PARSING,
+						`Flats parsing for ${this._fileUrls[idx]}`,
+					);
+					const texturesParser = new WadFileFlatsParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					const parsedFlats = texturesParser.parseFlats();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${parsedFlats.length} flats`,
+					);
+					return [parsedFlats];
+				}
+				return undefined;
+			},
 		);
-		const texturesParser = new WadFileFlatsParser({
-			lumps: [],
-			dir: dir,
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-		});
-		const flats = texturesParser.parseFlats();
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${flats.length} flats`,
-		);
 
+		const flats = result.map((r) => r[0]);
 		this.setFlats(flats);
 		return flats;
 	}
 
-	private setFlats(flats: WadFlat[]): void {
-		this._wadStruct.flats = flats;
+	private setFlats(flats: (WadFlat[] | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.flats = flats[idx];
+		});
 	}
 
-	public async sprites(): Promise<WadSprite[] | null> {
-		const dir = await this.directory();
+	public async flats(): Promise<WadFlat[]> {
+		const flats = (await this.flatsList()).filter((d) => d !== undefined);
+		return combineWadFlats(flats);
+	}
 
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.sprites !== undefined) {
-			return this._wadStruct.sprites;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.SPRITES_PARSING,
-			`Sprites parsing for ${this._fileUrl}`,
+	private async spritesList(): Promise<(WadSprite[] | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadSprite[]],
+			(WadDirectory | undefined)[]
+		>(
+			["sprites"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.SPRITES_PARSING,
+						`Sprites parsing for ${this._fileUrls[idx]}`,
+					);
+					const spritesParser = new WadFileSpritesParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					const parsedSprites = spritesParser.parseSprites();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${parsedSprites.length} sprites with ${parsedSprites.reduce((p, c) => p + c.frames.length, 0)} frames`,
+					);
+					return [parsedSprites];
+				}
+				return undefined;
+			},
 		);
-		const spritesParser = new WadFileSpritesParser({
-			lumps: [],
-			dir: dir,
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-		});
-		const sprites = spritesParser.parseSprites();
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${sprites.length} sprites with ${sprites.reduce((p, c) => p + c.frames.length, 0)} frames`,
-		);
+
+		const sprites = result.map((r) => r[0]);
 
 		this.setSprites(sprites);
 		return sprites;
 	}
 
-	private setSprites(sprites: WadSprite[]): void {
-		this._wadStruct.sprites = sprites;
+	private setSprites(sprites: (WadSprite[] | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.sprites = sprites[idx];
+		});
 	}
 
-	public async menuGraphics(): Promise<WadMenuGraphic[] | null> {
-		const dir = await this.directory();
+	public async sprites(): Promise<WadSprite[]> {
+		const sprites = (await this.spritesList()).filter((d) => d !== undefined);
+		return combineWadSprites(sprites);
+	}
 
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.menuGraphics !== undefined) {
-			return this._wadStruct.menuGraphics;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.MENU_GRAPHICS_PARSING,
-			`Menu graphics parsing for ${this._fileUrl}`,
+	private async menuGraphicsList(): Promise<(WadMenuGraphic[] | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadMenuGraphic[]],
+			(WadDirectory | undefined)[]
+		>(
+			["menuGraphics"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.MENU_GRAPHICS_PARSING,
+						`Menu graphics parsing for ${this._fileUrls[idx]}`,
+					);
+					const menuGraphicsParser = new WadFileMenuGraphicParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					const parsedMenuGraphics = menuGraphicsParser.parseMenuGraphics();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${parsedMenuGraphics.length} menu graphics`,
+					);
+					return [parsedMenuGraphics];
+				}
+				return undefined;
+			},
 		);
-		const menuGraphicsParser = new WadFileMenuGraphicParser({
-			lumps: [],
-			dir: dir,
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-			detectedType: (await this.detectedType()) ?? WadDetectedType.DOOM,
-		});
-		const menuGraphics = menuGraphicsParser.parseMenuGraphics();
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${menuGraphics.length} menu graphics`,
-		);
+
+		const menuGraphics = result.map((r) => r[0]);
 
 		this.setMenuGraphics(menuGraphics);
 		return menuGraphics;
 	}
 
-	private setMenuGraphics(menuGraphics: WadMenuGraphic[]): void {
-		this._wadStruct.menuGraphics = menuGraphics;
-	}
-
-	public async music(): Promise<WadMusic[] | null> {
-		const dir = await this.directory();
-
-		if (dir === null) {
-			return null;
-		}
-
-		if (this._wadStruct.music !== undefined) {
-			return this._wadStruct.music;
-		}
-
-		await this.sendEvent(
-			WadFileEvent.MUSIC_PARSING,
-			`Music parsing for ${this._fileUrl}`,
-		);
-		const musicParser = new WadFileMusicParser({
-			lumps: [],
-			dir: dir,
-			file: this.wadFile,
-			sendEvent: this.sendEvent,
-			mapInfo: await this.mapInfo(),
+	private setMenuGraphics(
+		menuGraphics: (WadMenuGraphic[] | undefined)[],
+	): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.menuGraphics = menuGraphics[idx];
 		});
-		const [music, musInfo] = await musicParser.parseMusic();
-		await this.sendEvent(
-			WadFileEvent.PARSED_COUNT,
-			`Parsed ${music.length} music files`,
+	}
+
+	public async menuGraphics(): Promise<WadMenuGraphic[]> {
+		const menuGraphics = (await this.menuGraphicsList()).filter(
+			(d) => d !== undefined,
+		);
+		return combineWadMenuStbarGraphics(menuGraphics);
+	}
+
+	private async stbarGraphicsList(): Promise<
+		(WadStbarGraphic[] | undefined)[]
+	> {
+		const result = await this.parseForAllWads<
+			[WadStbarGraphic[]],
+			(WadDirectory | undefined)[]
+		>(
+			["stbarGraphics"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.STBAR_GRAPHICS_PARSING,
+						`Stbar graphics parsing for ${this._fileUrls[idx]}`,
+					);
+					const menuGraphicsParser = new WadFileStbarGraphicParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+					});
+					const parsedStbarGraphics = menuGraphicsParser.parseStbarGraphics();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${parsedStbarGraphics.length} stbar graphics`,
+					);
+					return [parsedStbarGraphics];
+				}
+				return undefined;
+			},
 		);
 
-		this.setMusic(music);
-		if (musInfo) {
-			this.setMusInfo(musInfo);
-		}
-		return music;
+		const stbarGraphics = result.map((r) => r[0]);
+
+		this.setStbarGraphics(stbarGraphics);
+		return stbarGraphics;
 	}
 
-	private setMusic(music: WadMusic[]): void {
-		this._wadStruct.music = music;
+	private setStbarGraphics(
+		stbarGraphics: (WadStbarGraphic[] | undefined)[],
+	): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.stbarGraphics = stbarGraphics[idx];
+		});
 	}
 
-	public async musInfo(): Promise<WadMusInfo | null> {
-		await this.music();
-		if (this._wadStruct.musInfo !== undefined) {
-			return this._wadStruct.musInfo;
-		}
-		return null;
+	public async stbarGraphics(): Promise<WadStbarGraphic[]> {
+		const stbarGraphics = (await this.stbarGraphicsList()).filter(
+			(d) => d !== undefined,
+		);
+		return combineWadMenuStbarGraphics(stbarGraphics);
 	}
 
-	private setMusInfo(musInfo: WadMusInfo): void {
-		this._wadStruct.musInfo = musInfo;
+	private async musicList(): Promise<(WadMusic[] | undefined)[]> {
+		const result = await this.parseForAllWads<
+			[WadMusic[], WadMusInfo | undefined],
+			(WadDirectory | undefined)[]
+		>(
+			["music"],
+			async () => {
+				return await this.directories();
+			},
+			async (idx, dirs) => {
+				if (dirs[idx]) {
+					await this.sendEvent(
+						WadFileEvent.MUSIC_PARSING,
+						`Music parsing for ${this._fileUrls[idx]}`,
+					);
+					const musicParser = new WadFileMusicParser({
+						lumps: [],
+						dir: dirs[idx],
+						file: this._wadFiles[idx],
+						sendEvent: this.sendEvent,
+						mapInfo: await this.mapInfo(),
+						dehacked: await this.dehacked(),
+					});
+					const [music, musInfo] = await musicParser.parseMusic();
+					await this.sendEvent(
+						WadFileEvent.PARSED_COUNT,
+						`Parsed ${music.length} music files`,
+					);
+
+					return [music, musInfo];
+				}
+				return undefined;
+			},
+		);
+
+		const musics = result.map((r) => r[0]);
+		const musInfos = result.map((r) => r[1]);
+
+		this.setMusics(musics);
+		this.setMusInfos(musInfos);
+
+		return musics;
+	}
+
+	private setMusics(musics: (WadMusic[] | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.music = musics[idx];
+		});
+	}
+
+	public async music(): Promise<WadMusic[]> {
+		const musics = (await this.musicList()).filter((d) => d !== undefined);
+		return combineWadMusic(musics);
+	}
+
+	private async musInfos(): Promise<(WadMusInfo | undefined)[]> {
+		await this.musicList();
+		return this._wadStructs.map((s) => s.musInfo);
+	}
+
+	private setMusInfos(musInfos: (WadMusInfo | undefined)[]): void {
+		this._wadStructs.forEach((w, idx) => {
+			w.musInfo = musInfos[idx];
+		});
+	}
+
+	public async musInfo(): Promise<WadMusInfo> {
+		const musInfos = (await this.musInfos()).filter((d) => d !== undefined);
+		return combineWadMusInfos(musInfos);
 	}
 }

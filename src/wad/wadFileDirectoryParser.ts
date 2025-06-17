@@ -2,6 +2,7 @@ import { type FileTypeResult, fileTypeFromBuffer } from "file-type";
 import {
 	LumpType,
 	type WadDirectory,
+	type WadDirectoryEntry,
 	WadFileMapInfoParser,
 	WadFileParser,
 	type WadHeader,
@@ -10,7 +11,7 @@ import {
 	colormapLumpName,
 	compLvlLumpName,
 	dehackedLumpName,
-	musicLumpNames,
+	demoMatcher,
 	endoomLumpName,
 	flatEndLumpMatcher,
 	flatStartLumpMatcher,
@@ -20,6 +21,9 @@ import {
 	isMapLump,
 	mapInfoLumpMatcher,
 	mapNameMatcher,
+	menuGraphicLumpNames,
+	musInfoLumpName,
+	musicLumpNames,
 	patchEndLumpMatcher,
 	patchStartLumpMatcher,
 	playpalLumpName,
@@ -32,10 +36,6 @@ import {
 	texture1LumpName,
 	texture2LumpName,
 	utf8ArrayToStr,
-	demoMatcher,
-	menuGraphicLumpNames,
-	type WadDirectoryEntry,
-	musInfoLumpName,
 } from "../index.js";
 import {
 	getWadMapInfoMenuGraphics,
@@ -150,7 +150,11 @@ export class WadFileDirectoryParser extends WadFileParser {
 				view.subarray(viewStart + 8, viewStart + 16),
 			).toUpperCase();
 
-			const [type, detectedMarker] = this.detectLumpType(lumpName, lastMarker);
+			const [type, detectedMarker] = this.detectLumpType(
+				lumpName,
+				lumpSize,
+				lastMarker,
+			);
 			lastMarker = detectedMarker;
 
 			let imageType: FileTypeResult | undefined;
@@ -209,9 +213,10 @@ export class WadFileDirectoryParser extends WadFileParser {
 
 	private detectLumpType = (
 		lumpName: string,
+		lumpSize: number,
 		lastMarker: LumpType | null,
 	): [LumpType, LumpType | null] => {
-		// IMAGES
+		// MARKERS
 		if (lumpName.match(patchStartLumpMatcher))
 			return [LumpType.PATCH_START, LumpType.PATCH_START];
 		if (lumpName.match(patchEndLumpMatcher))
@@ -232,6 +237,13 @@ export class WadFileDirectoryParser extends WadFileParser {
 			return [LumpType.HI_START, LumpType.HI_START];
 		if (lumpName === hiresTexEndLumpName)
 			return [LumpType.HI_END, LumpType.HI_END];
+		if (lumpName.match(mapNameMatcher)) return [LumpType.MAPMARKER, lastMarker];
+
+		// DATA
+		if (lumpSize === 0) {
+			return [LumpType.UNKNOWN, lastMarker];
+		}
+
 		if (lumpName === pnamesLumpName) return [LumpType.PNAMES, lastMarker];
 		if (lumpName === texture1LumpName) return [LumpType.TEXTURES1, lastMarker];
 		if (lumpName === texture2LumpName) return [LumpType.TEXTURES2, lastMarker];
@@ -251,7 +263,6 @@ export class WadFileDirectoryParser extends WadFileParser {
 			return [LumpType.HI_PATCH, lastMarker];
 		}
 
-		// MISC
 		if (lumpName === compLvlLumpName) return [LumpType.COMPLVL, lastMarker];
 		if (lumpName === playpalLumpName) return [LumpType.PLAYPAL, lastMarker];
 		if (lumpName === colormapLumpName) return [LumpType.COLORMAP, lastMarker];
@@ -260,13 +271,10 @@ export class WadFileDirectoryParser extends WadFileParser {
 		if (lumpName.match(demoMatcher)) return [LumpType.DEMO, lastMarker];
 		if (lumpName === musInfoLumpName) return [LumpType.MUSINFO, lastMarker];
 
-		// MAP
-		if (lumpName.match(mapNameMatcher)) return [LumpType.MAPMARKER, lastMarker];
 		if (lumpName.match(mapInfoLumpMatcher))
 			return [LumpType.MAPINFO, lastMarker];
 		if (isMapLump(lumpName)) return [LumpType.MAPDATA, lastMarker];
 
-		// HEAVIER MATCHERS
 		for (const matcher of statusBarLumpMatchers) {
 			if (lumpName.match(matcher)) return [LumpType.STBAR_PATCH, lastMarker];
 		}
@@ -323,7 +331,7 @@ export class WadFileDirectoryParser extends WadFileParser {
 		const modFileType = this.detectModuleType(data);
 
 		if (modFileType) {
-			return { ext: modFileType, mime: "audio/mod-module" };
+			return { ext: modFileType, mime: "audio/x-mod" };
 		}
 		return null;
 	};
@@ -421,13 +429,13 @@ export class WadFileDirectoryParser extends WadFileParser {
 			const sampleCountWithPadding = view.getUint32(4, true);
 			const expectedLength = 24 + (sampleCountWithPadding - 16);
 			if (data.byteLength === expectedLength)
-				return { ext: "dmx", mime: "audio/doom-sfx-dmx" };
+				return { ext: "dmx", mime: "audio/x-doom-sfx-dmx" };
 		}
 		if (format === 0) {
 			const sampleCount = view.getUint16(2, true);
 			const expectedLength = 4 + sampleCount;
 			if (data.byteLength === expectedLength)
-				return { ext: "spk", mime: "audio/doom-sfx-speaker" };
+				return { ext: "spk", mime: "audio/x-doom-sfx-speaker" };
 		}
 
 		return null;

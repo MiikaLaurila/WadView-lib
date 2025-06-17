@@ -1,4 +1,5 @@
 import {
+	type EventFunc,
 	type WadDehacked,
 	type WadDehackedAmmo,
 	type WadDehackedBexKvp,
@@ -15,7 +16,7 @@ import {
 	WadDehackedThingFlag,
 	WadDehackedToThingType,
 	type WadDehackedWeapon,
-	WadFileParser,
+	type WadDirectoryEntry,
 	WadMapThingGroup,
 	defaultWadDehacked,
 	dehackedLumpName,
@@ -35,40 +36,91 @@ enum BlockType {
 	AMMO = "AMMO",
 	TEXT = "TEXT",
 	MISC = "MISC",
-	STRINGS = "STRINGS",
-	PARS = "PARS",
-	CODEPTR = "CODEPTR",
+	BEXSTRINGS = "STRINGS",
+	BEXPARS = "PARS",
+	BEXCODEPTR = "CODEPTR",
 	CHEATS = "CHEATS",
 	SOUND = "SOUND",
-	HELPER = "HELPER",
-	SPRITES = "SPRITES",
+	BEXHELPER = "HELPER",
+	BEXSPRITES = "SPRITES",
 	BEXSOUNDS = "BEXSOUNDS",
-	MUSIC = "MUSIC",
+	BEXMUSIC = "MUSIC",
 }
 
-export class WadFileDehackedParser extends WadFileParser {
-	public parseDehacked = (): WadDehacked | null => {
-		if (this.lumps.length === 0 || this.lumps[0].lumpName !== dehackedLumpName)
-			return null;
+const bexBlocks: BlockType[] = [
+	BlockType.BEXCODEPTR,
+	BlockType.BEXHELPER,
+	BlockType.BEXMUSIC,
+	BlockType.BEXPARS,
+	BlockType.BEXSOUNDS,
+	BlockType.BEXSPRITES,
+	BlockType.BEXSTRINGS,
+] as const;
 
-		const dehackedCharSize = 1;
-		const charCount = this.lumps[0].lumpSize / dehackedCharSize;
+interface WadFileDehackedParserOptions {
+	dehackedBuffer?: ArrayBuffer;
+	file?: ArrayBuffer;
+	fileName?: string;
+	lumps?: WadDirectoryEntry[];
+	sendEvent: EventFunc;
+}
+
+export class WadFileDehackedParser {
+	private dehackedBuffer?: ArrayBuffer;
+	private sendEvent: EventFunc;
+	private file?: ArrayBuffer;
+	private fileName?: string;
+	private lumps: WadDirectoryEntry[];
+	constructor(opts: WadFileDehackedParserOptions) {
+		this.file = opts.file;
+		this.sendEvent = opts.sendEvent;
+		this.lumps = opts.lumps ?? [];
+		this.dehackedBuffer = opts.dehackedBuffer;
+		this.fileName = opts.fileName;
+	}
+
+	private getDehView = (): Uint8Array | null => {
+		if (this.dehackedBuffer) {
+			return new Uint8Array(this.dehackedBuffer);
+		}
+		if (
+			!this.file ||
+			this.lumps.length === 0 ||
+			this.lumps[0].lumpName !== dehackedLumpName
+		) {
+			return null;
+		}
+
 		const view = new Uint8Array(
 			this.file.slice(
 				this.lumps[0].lumpLocation,
 				this.lumps[0].lumpLocation + this.lumps[0].lumpSize,
 			),
 		);
+		return view;
+	};
+
+	private getDehSource = (): string => {
+		if (this.dehackedBuffer) {
+			return "Loose .deh file";
+		}
+		return `Lump ${this.lumps[0].lumpName} in ${this.fileName}`;
+	};
+
+	public parseDehacked = (): WadDehacked => {
+		const view = this.getDehView();
+		if (!view) {
+			return JSON.parse(JSON.stringify(defaultWadDehacked));
+		}
 
 		const dehacked: WadDehacked = JSON.parse(
 			JSON.stringify(defaultWadDehacked),
 		);
 
-		for (let i = 0; i < charCount; i++) {
-			const viewStart = i * dehackedCharSize;
-			dehacked.dehackedString += String.fromCharCode(view[viewStart]);
+		for (let i = 0; i < view.byteLength; i++) {
+			dehacked.dehackedString += String.fromCharCode(view[i]);
 		}
-
+		dehacked.source = this.getDehSource();
 		dehacked.parsed = this.parseDehString(dehacked.dehackedString);
 		dehacked.thingTranslations = dehacked.parsed.things.map((t) => {
 			if (
@@ -120,7 +172,7 @@ export class WadFileDehackedParser extends WadFileParser {
 		return dehacked;
 	};
 
-	public parseDehString(content: string): WadDehackedFile {
+	private parseDehString(content: string): WadDehackedFile {
 		const lines = content.split("\n");
 		const result: WadDehackedFile = {
 			things: [],
@@ -216,7 +268,7 @@ export class WadFileDehackedParser extends WadFileParser {
 				currentMisc = {};
 			}
 
-			if (currentBlock === BlockType.HELPER) {
+			if (currentBlock === BlockType.BEXHELPER) {
 				result.helperThing = currentHelper as WadDehackedHelperThing;
 				currentHelper = {};
 			}
@@ -226,12 +278,12 @@ export class WadFileDehackedParser extends WadFileParser {
 				currentCheats = {};
 			}
 
-			if (currentBlock === BlockType.STRINGS) {
+			if (currentBlock === BlockType.BEXSTRINGS) {
 				result.bexStrings = [...currentBexKvpArray];
 				currentBexKvpArray = [];
 			}
 
-			if (currentBlock === BlockType.SPRITES) {
+			if (currentBlock === BlockType.BEXSPRITES) {
 				result.bexSprites = [...currentBexKvpArray];
 				currentBexKvpArray = [];
 			}
@@ -241,17 +293,17 @@ export class WadFileDehackedParser extends WadFileParser {
 				currentBexKvpArray = [];
 			}
 
-			if (currentBlock === BlockType.MUSIC) {
+			if (currentBlock === BlockType.BEXMUSIC) {
 				result.bexMusic = [...currentBexKvpArray];
 				currentBexKvpArray = [];
 			}
 
-			if (currentBlock === BlockType.CODEPTR) {
+			if (currentBlock === BlockType.BEXCODEPTR) {
 				result.pointers = [...currentCodePtrs];
 				currentCodePtrs = [];
 			}
 
-			if (currentBlock === BlockType.PARS) {
+			if (currentBlock === BlockType.BEXPARS) {
 				result.pars = [...currentPars];
 				currentPars = [];
 			}
@@ -282,15 +334,35 @@ export class WadFileDehackedParser extends WadFileParser {
 			currentBlock = null;
 		};
 
+		const isBlockStart = (trimmed: string): boolean => {
+			return (
+				trimmed.startsWith("Thing ") ||
+				(trimmed.startsWith("Frame ") && !trimmed.includes("=")) ||
+				trimmed.startsWith("Weapon ") ||
+				trimmed.startsWith("Ammo ") ||
+				trimmed.startsWith("Sound ") ||
+				trimmed.startsWith("Misc") ||
+				trimmed.startsWith("Cheat") ||
+				trimmed.startsWith("[STRINGS]") ||
+				trimmed.startsWith("[SPRITES]") ||
+				trimmed.startsWith("[SOUNDS]") ||
+				trimmed.startsWith("[MUSIC]") ||
+				trimmed.startsWith("[CODEPTR]") ||
+				trimmed.startsWith("[PARS]") ||
+				trimmed.startsWith("[HELPER]") ||
+				trimmed.startsWith("Text ")
+			);
+		};
+
 		for (const line of lines) {
 			const trimmed = line.trim();
 			if (trimmed.startsWith("#")) continue;
-			if (!trimmed && !processingTextBlock && !processingMultiLineBexString) {
-				pushBlock();
-				continue;
-			}
 
 			if (processingTextBlock) {
+				if (isBlockStart(trimmed)) {
+					pushBlock();
+					continue;
+				}
 				textToProcess += `${trimmed}\n`;
 				if (textToProcess.length >= expectedTextLength) {
 					pushBlock();
@@ -306,6 +378,10 @@ export class WadFileDehackedParser extends WadFileParser {
 					});
 					processingMultiLineBexString = false;
 				}
+			}
+
+			if (isBlockStart(trimmed) && currentBlock) {
+				pushBlock();
 			}
 
 			if (trimmed.startsWith("Thing ")) {
@@ -335,25 +411,25 @@ export class WadFileDehackedParser extends WadFileParser {
 				currentBlock = BlockType.CHEATS;
 				currentCheats = {};
 			} else if (trimmed.startsWith("[STRINGS]")) {
-				currentBlock = BlockType.STRINGS;
+				currentBlock = BlockType.BEXSTRINGS;
 				currentBexKvpArray = [];
 			} else if (trimmed.startsWith("[SPRITES]")) {
-				currentBlock = BlockType.SPRITES;
+				currentBlock = BlockType.BEXSPRITES;
 				currentBexKvpArray = [];
 			} else if (trimmed.startsWith("[SOUNDS]")) {
 				currentBlock = BlockType.BEXSOUNDS;
 				currentBexKvpArray = [];
 			} else if (trimmed.startsWith("[MUSIC]")) {
-				currentBlock = BlockType.MUSIC;
+				currentBlock = BlockType.BEXMUSIC;
 				currentBexKvpArray = [];
 			} else if (trimmed.startsWith("[CODEPTR]")) {
-				currentBlock = BlockType.CODEPTR;
+				currentBlock = BlockType.BEXCODEPTR;
 				currentCodePtrs = [];
 			} else if (trimmed.startsWith("[PARS]")) {
-				currentBlock = BlockType.PARS;
+				currentBlock = BlockType.BEXPARS;
 				currentPars = [];
 			} else if (trimmed.startsWith("[HELPER]")) {
-				currentBlock = BlockType.HELPER;
+				currentBlock = BlockType.BEXHELPER;
 				currentHelper = {};
 			} else if (trimmed.startsWith("Text ")) {
 				currentBlock = BlockType.TEXT;
@@ -395,7 +471,7 @@ export class WadFileDehackedParser extends WadFileParser {
 						if (!key || value === undefined || value === null) continue;
 						this.processCheatsKey(currentCheats, key, value);
 						break;
-					case BlockType.STRINGS:
+					case BlockType.BEXSTRINGS:
 						if (!key || value === undefined || value === null) continue;
 						if (typeof value === "string" && value.endsWith("\\")) {
 							processingMultiLineBexString = true;
@@ -405,23 +481,23 @@ export class WadFileDehackedParser extends WadFileParser {
 							currentBexKvpArray.push({ key, value });
 						}
 						break;
-					case BlockType.SPRITES:
+					case BlockType.BEXSPRITES:
 					case BlockType.BEXSOUNDS:
-					case BlockType.MUSIC:
+					case BlockType.BEXMUSIC:
 						if (!key || value === undefined || value === null) continue;
 						currentBexKvpArray.push({ key, value });
 						break;
-					case BlockType.CODEPTR:
+					case BlockType.BEXCODEPTR:
 						if (!key || value === undefined || value === null) continue;
 						currentCodePtrs.push({
 							frameIndex: Number.parseInt(key.split(" ")[1]),
 							codepFrame: value,
 						});
 						break;
-					case BlockType.PARS:
+					case BlockType.BEXPARS:
 						this.processParLine(currentPars, trimmed);
 						break;
-					case BlockType.HELPER:
+					case BlockType.BEXHELPER:
 						if (
 							!key ||
 							value === undefined ||

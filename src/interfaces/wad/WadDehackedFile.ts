@@ -373,3 +373,38 @@ export function namesToDehWeaponMBF21Flags(names: string[]): number {
 
 	return result;
 }
+
+export const huStrToMap: Record<string, string> = {
+	HUSTR_1: "MAP01",
+	HUSTR_2: "MAP02",
+	HUSTR_3: "MAP03",
+	HUSTR_4: "MAP04",
+	HUSTR_5: "MAP05",
+	HUSTR_6: "MAP06",
+	HUSTR_7: "MAP07",
+	HUSTR_8: "MAP08",
+	HUSTR_9: "MAP09",
+	HUSTR_10: "MAP10",
+	HUSTR_11: "MAP11",
+	HUSTR_12: "MAP12",
+	HUSTR_13: "MAP13",
+	HUSTR_14: "MAP14",
+	HUSTR_15: "MAP15",
+	HUSTR_16: "MAP16",
+	HUSTR_17: "MAP17",
+	HUSTR_18: "MAP18",
+	HUSTR_19: "MAP19",
+	HUSTR_20: "MAP20",
+	HUSTR_21: "MAP21",
+	HUSTR_22: "MAP22",
+	HUSTR_23: "MAP23",
+	HUSTR_24: "MAP24",
+	HUSTR_25: "MAP25",
+	HUSTR_26: "MAP26",
+	HUSTR_27: "MAP27",
+	HUSTR_28: "MAP28",
+	HUSTR_29: "MAP29",
+	HUSTR_30: "MAP30",
+	HUSTR_31: "MAP31",
+	HUSTR_32: "MAP32",
+};

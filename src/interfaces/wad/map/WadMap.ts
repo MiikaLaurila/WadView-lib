@@ -10,6 +10,7 @@ import {
 	type WadMapSidedef,
 	type WadMapSubSector,
 	type WadMapThing,
+	WadMapThingGroup,
 	defaultWadMapBlockmap,
 } from "../../index.js";
 

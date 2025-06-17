@@ -1,6 +1,6 @@
 {
 	"name": "wadview-lib",
-	"version": "0.0.10",
+	"version": "0.0.12",
 	"description": "Parse and present Doom .wad files",
 	"license": "ISC",
 	"author": "Miika Laurila <laurila.miika@gmail.com>",

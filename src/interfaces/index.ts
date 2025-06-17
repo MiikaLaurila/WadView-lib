@@ -127,6 +127,7 @@ export {
 	hasDehWeaponMBF21Flags,
 	namesToDehThingMBF21Flags,
 	namesToDehWeaponMBF21Flags,
+	huStrToMap,
 } from "./wad/WadDehackedFile.js";
 export {
 	WadDehacked,
@@ -160,9 +161,14 @@ export {
 	WadTexture,
 	WadTextures,
 } from "./wad/texture/WadTextures.js";
-export { WadFileParser, WadParserOptions } from "./wad/WadParser.js";
+export { WadFileParser, WadParserOptions, EventFunc } from "./wad/WadParser.js";
 export { WadMenuGraphic } from "./wad/texture/WadMenuGraphic.js";
-export { WadMusic } from "./wad/WadMusic.js";
+export {
+	WadMusic,
+	doomMapIdToMusic,
+	doomMusicToNameMap,
+	dehackedLevelTextToMusicId,
+} from "./wad/WadMusic.js";
 export {
 	WadUMapInfo,
 	WadUMapInfoMap,
@@ -186,3 +192,5 @@ export {
 	getWadMapInfoMusic,
 } from "./wad/WadMapInfo.js";
 export { WadMusInfo } from "./wad/WadMusInfo.js";
+export { WadFileInfo } from "./WadFileInfo.js";
+export { WadStbarGraphic } from "./wad/texture/WadStbarGraphic.js";
