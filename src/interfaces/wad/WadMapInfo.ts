@@ -247,21 +247,21 @@ export const getWadMapInfoMusic = (
 	mapInfo: WadMapInfo,
 ): Map<string, string> => {
 	const musicMap = new Map<string, string>();
-	if (mapInfo.type === WadMapInfoType.UMAPINFO && mapInfo.uMapInfo) {
+	if (mapInfo.uMapInfo) {
 		for (const info of Object.values(mapInfo.uMapInfo)) {
 			if (info.music) {
 				musicMap.set(info.music, info.id);
 			}
 		}
 	}
-	if (mapInfo.type === WadMapInfoType.DMAPINFO && mapInfo.dMapInfo) {
+	if (mapInfo.dMapInfo) {
 		for (const info of mapInfo.dMapInfo.maps) {
 			if (info.music) {
 				musicMap.set(info.music, info.id);
 			}
 		}
 	}
-	if (mapInfo.type === WadMapInfoType.ZMAPINFO && mapInfo.zMapInfo) {
+	if (mapInfo.zMapInfo) {
 		for (const info of mapInfo.zMapInfo.maps) {
 			if (info.music) {
 				musicMap.set(info.music, info.id);
@@ -273,28 +273,30 @@ export const getWadMapInfoMusic = (
 
 export const getWadMapInfoPatchNames = (mapInfo: WadMapInfo): string[] => {
 	const patches: (string | undefined)[] = [];
-	if (mapInfo.type === WadMapInfoType.UMAPINFO && mapInfo.uMapInfo) {
+	if (mapInfo.uMapInfo) {
 		for (const info of Object.values(mapInfo.uMapInfo)) {
 			patches.push(info.skytexture);
 		}
 	}
-	if (mapInfo.type === WadMapInfoType.DMAPINFO && mapInfo.dMapInfo) {
+	if (mapInfo.dMapInfo) {
 		for (const info of mapInfo.dMapInfo.maps) {
 			patches.push(info.sky1.lump);
 		}
 	}
-	if (mapInfo.type === WadMapInfoType.ZMAPINFO && mapInfo.zMapInfo) {
+	if (mapInfo.zMapInfo) {
 		for (const info of mapInfo.zMapInfo.maps) {
 			patches.push(info.sky1);
 			patches.push(info.sky2);
 		}
 	}
-	return patches.filter((p) => p !== undefined && p) as string[];
+	return Array.from(
+		new Set(patches.filter((p) => p !== undefined && p)),
+	) as string[];
 };
 
 export const getWadMapInfoMenuGraphics = (mapInfo: WadMapInfo): string[] => {
 	const menuPatches: (string | undefined)[] = [];
-	if (mapInfo.type === WadMapInfoType.UMAPINFO && mapInfo.uMapInfo) {
+	if (mapInfo.uMapInfo) {
 		for (const info of Object.values(mapInfo.uMapInfo)) {
 			menuPatches.push(info.levelpic);
 			menuPatches.push(info.exitpic);
@@ -305,12 +307,14 @@ export const getWadMapInfoMenuGraphics = (mapInfo: WadMapInfo): string[] => {
 			}
 		}
 	}
-	if (mapInfo.type === WadMapInfoType.ZMAPINFO && mapInfo.zMapInfo) {
+	if (mapInfo.zMapInfo) {
 		for (const info of mapInfo.zMapInfo.maps) {
 			menuPatches.push(info.titlepatch);
 			menuPatches.push(info.exitpic);
 			menuPatches.push(info.enterpic);
 		}
 	}
-	return menuPatches.filter((p) => p !== undefined && p) as string[];
+	return Array.from(
+		new Set(menuPatches.filter((p) => p !== undefined && p)),
+	) as string[];
 };

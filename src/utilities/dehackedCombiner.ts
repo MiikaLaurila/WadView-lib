@@ -107,25 +107,25 @@ export function combineWadDehacked(dehs: WadDehacked[]): WadDehacked {
 			key: "bexStrings",
 			source: (deh) => deh.parsed.bexStrings,
 			target: (file) => file.bexStrings,
-			getKey: (bex) => `bexs_${bex.key}`,
+			getKey: (bex) => `bexstr_${bex.key}`,
 		},
 		{
 			key: "bexSprites",
 			source: (deh) => deh.parsed.bexSprites,
 			target: (file) => file.bexSprites,
-			getKey: (bex) => `bexs_${bex.key}`,
+			getKey: (bex) => `bexspr_${bex.key}`,
 		},
 		{
 			key: "bexSounds",
 			source: (deh) => deh.parsed.bexSounds,
 			target: (file) => file.bexSounds,
-			getKey: (bex) => `bexs_${bex.key}`,
+			getKey: (bex) => `bexsnd_${bex.key}`,
 		},
 		{
 			key: "bexMusic",
 			source: (deh) => deh.parsed.bexMusic,
 			target: (file) => file.bexMusic,
-			getKey: (bex) => `bexs_${bex.key}`,
+			getKey: (bex) => `bexmus_${bex.key}`,
 		},
 	];
 

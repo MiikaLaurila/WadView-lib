@@ -44,7 +44,6 @@ export class WadFileMusInfoParser extends WadFileParser {
 
 		const musicToMap: Record<string, string[]> = {};
 
-		// Invert the mapping from mapToMusic to musicToMap
 		for (const [mapName, { music }] of Object.entries(mapToMusic)) {
 			for (const track of music) {
 				if (!musicToMap[track]) {

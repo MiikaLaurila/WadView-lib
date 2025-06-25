@@ -106,25 +106,6 @@ export class WadFileMusicParser extends WadFileParser {
 			}
 		}
 
-		// check musinfo for a doom map id where music appears
-		if (
-			!mapName &&
-			musInfo?.musicToMap[musicLump.lumpName] &&
-			musInfo.musicToMap[musicLump.lumpName].length > 0
-		) {
-			if (mapNameMap) {
-				const mapId = musInfo.musicToMap[musicLump.lumpName][0];
-				const foundName = mapNameMap.get(mapId);
-				if (foundName) {
-					if (foundName.match(globalMapNameMatcher)) {
-						mapName = `${foundName}`;
-					} else {
-						mapName = `${mapId}: ${foundName}`;
-					}
-				}
-			}
-		}
-
 		// check [STRINGS] from dehacked
 		if (!mapName && this.dehacked?.parsed.bexStrings) {
 			for (const str of this.dehacked.parsed.bexStrings) {
@@ -154,6 +135,25 @@ export class WadFileMusicParser extends WadFileParser {
 				) {
 					mapName = dehText.to;
 					break;
+				}
+			}
+		}
+
+		// check musinfo for a doom map id where music appears
+		if (
+			!mapName &&
+			musInfo?.musicToMap[musicLump.lumpName] &&
+			musInfo.musicToMap[musicLump.lumpName].length > 0
+		) {
+			if (mapNameMap) {
+				const mapId = musInfo.musicToMap[musicLump.lumpName][0];
+				const foundName = mapNameMap.get(mapId);
+				if (foundName) {
+					if (foundName.match(globalMapNameMatcher)) {
+						mapName = `${foundName}`;
+					} else {
+						mapName = `${mapId}: ${foundName}`;
+					}
 				}
 			}
 		}
